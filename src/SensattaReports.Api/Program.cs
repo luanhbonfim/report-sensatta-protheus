@@ -16,7 +16,13 @@ builder.Host.UseWindowsService();
 builder.Host.UseSystemd();
 
 // --- Renderizadores: PDF (layout do .rtm) + Excel (dado cru) -------------
-builder.Services.AddSingleton<IReportRenderer, PdfReportRenderer>();
+// Logo generica usada em todos os reports (na posicao que cada .rtm define).
+var logoPath = builder.Configuration["Reports:LogoPath"];
+if (string.IsNullOrWhiteSpace(logoPath))
+    logoPath = Path.Combine(AppContext.BaseDirectory, "reports", "_assets", "logo.png");
+var logo = File.Exists(logoPath) ? File.ReadAllBytes(logoPath) : null;
+
+builder.Services.AddSingleton<IReportRenderer>(new PdfReportRenderer(logo));
 builder.Services.AddSingleton<IReportRenderer, ExcelReportExporter>();
 
 // --- Repositorio da definicao do report ----------------------------------

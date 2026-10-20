@@ -12,7 +12,7 @@ public class RbTemplateTests
 {
     private static string SampleRtm()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "reports", "resumo-coletas-eua.rtm");
+        var path = Path.Combine(AppContext.BaseDirectory, "reports", "resumo-coletas-eua", "report.rtm");
         return File.ReadAllText(path);
     }
 

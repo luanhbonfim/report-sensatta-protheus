@@ -20,6 +20,15 @@ public sealed class PdfReportRenderer : IReportRenderer
         GlobalFontSettings.FontResolver ??= new SimpleFontResolver();
     }
 
+    private readonly byte[]? _logo;
+
+    /// <summary>
+    /// logoPng: imagem (PNG/JPEG) usada no lugar das imagens do .rtm — a logo
+    /// generica, desenhada na posicao que cada template define. Se null, usa a
+    /// imagem embutida no proprio .rtm.
+    /// </summary>
+    public PdfReportRenderer(byte[]? logoPng = null) => _logo = logoPng;
+
     public ReportFormat Format => ReportFormat.Pdf;
 
     public ReportOutput Render(ReportDefinition definition, ReportDataSet data)
@@ -127,7 +136,7 @@ public sealed class PdfReportRenderer : IReportRenderer
         };
     }
 
-    private static void DrawBand(XGraphics gfx, RbTemplate tpl, RbBand band,
+    private void DrawBand(XGraphics gfx, RbTemplate tpl, RbBand band,
         double bandTopMm, object?[]? row, ReportDataSet data)
     {
         foreach (var el in band.Elements)
@@ -138,7 +147,7 @@ public sealed class PdfReportRenderer : IReportRenderer
         }
     }
 
-    private static void DrawElement(XGraphics gfx, RbElement el,
+    private void DrawElement(XGraphics gfx, RbElement el,
         double xMm, double yMm, object?[]? row, ReportDataSet data)
     {
         var x = XUnit.FromMillimeter(xMm).Point;
@@ -177,20 +186,22 @@ public sealed class PdfReportRenderer : IReportRenderer
                 DrawText(gfx, text, db.Font, db.Alignment, rect);
                 break;
 
-            case RbImage img when img.HasImage:
-                try
+            case RbImage img:
+                // prioriza a logo generica; se nao houver, usa a imagem do .rtm
+                var imgBytes = _logo ?? (img.HasImage ? img.Jpeg : null);
+                if (imgBytes is not null)
                 {
-                    // PdfSharp 6.1 recebe o Stream diretamente. O MemoryStream sobre
-                    // um byte[] nao tem recurso nao-gerenciado; o XImage segura a
-                    // referencia, entao nao precisamos (nem devemos) descarta-lo aqui.
-                    var image = XImage.FromStream(new MemoryStream(img.Jpeg));
-                    gfx.DrawImage(image, rect);
-                }
-                catch (Exception ex)
-                {
-                    // nao derruba o report; registra o motivo no console para diagnostico
-                    Console.Error.WriteLine(
-                        $"[PdfReportRenderer] Falha ao desenhar imagem ({img.Jpeg.Length} bytes): {ex.GetType().Name}: {ex.Message}");
+                    try
+                    {
+                        var image = XImage.FromStream(new MemoryStream(imgBytes));
+                        gfx.DrawImage(image, rect);
+                    }
+                    catch (Exception ex)
+                    {
+                        // nao derruba o report; registra o motivo no console para diagnostico
+                        Console.Error.WriteLine(
+                            $"[PdfReportRenderer] Falha ao desenhar imagem ({imgBytes.Length} bytes): {ex.GetType().Name}: {ex.Message}");
+                    }
                 }
                 break;
         }

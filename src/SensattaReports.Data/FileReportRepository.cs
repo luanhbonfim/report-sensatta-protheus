@@ -4,22 +4,23 @@ using SensattaReports.Core.Models;
 namespace SensattaReports.Data;
 
 /// <summary>
-/// Repositorio de DESENVOLVIMENTO: le a definicao de um report de arquivos
-/// numa pasta, sem precisar de Oracle. Para o codigo "x" procura:
-///   x.sql          (o SELECT)
-///   x.rtm          (o template)
-///   x.params.json  (opcional, os parametros)
+/// Repositorio de DESENVOLVIMENTO: le a definicao de um report dos arquivos
+/// numa subpasta por report, sem precisar de Oracle. Para o codigo "x" procura:
+///   reports/x/report.sql          (o SELECT)
+///   reports/x/report.rtm          (o template)
+///   reports/x/report.params.json  (opcional, os parametros)
 /// </summary>
 public sealed class FileReportRepository(string baseDir) : IReportRepository
 {
     public async Task<ReportDefinition?> GetByCodigoAsync(string codigo, CancellationToken ct = default)
     {
-        var sqlPath = Path.Combine(baseDir, codigo + ".sql");
-        var rtmPath = Path.Combine(baseDir, codigo + ".rtm");
+        var dir = Path.Combine(baseDir, codigo);
+        var sqlPath = Path.Combine(dir, "report.sql");
+        var rtmPath = Path.Combine(dir, "report.rtm");
         if (!File.Exists(sqlPath) || !File.Exists(rtmPath))
             return null;
 
-        var paramsPath = Path.Combine(baseDir, codigo + ".params.json");
+        var paramsPath = Path.Combine(dir, "report.params.json");
         var paramsJson = File.Exists(paramsPath) ? await File.ReadAllTextAsync(paramsPath, ct) : null;
 
         return new ReportDefinition

@@ -147,16 +147,27 @@ Erros: `404` report não encontrado, `400` parâmetro obrigatório ausente/ inv�
 
 ## Como cadastrar um novo report
 
-Os reports ficam **versionados no Git**, como arquivos na pasta `reports/`. Para
-cada report com código `x`, crie três arquivos:
+Os reports ficam **versionados no Git**, cada um na sua **subpasta** em `reports/`:
 
-- `reports/x.sql` — o SELECT, com binds `:param`
-- `reports/x.rtm` — o template do ReportBuilder
-- `reports/x.params.json` — os parâmetros (opcional)
+```
+reports/
+├── _assets/
+│   └── logo.png                 # logo generica, usada em todos os reports
+└── <codigo>/
+    ├── report.sql               # o SELECT, com binds :param
+    ├── report.rtm               # o template do ReportBuilder
+    └── report.params.json       # os parametros (opcional)
+```
 
-Passos:
+A **logo** (`reports/_assets/logo.png`) é desenhada na posição que cada `.rtm`
+define para a imagem — assim fica sempre no mesmo canto, em todos os reports, sem
+depender da imagem embutida no template. Para trocar a logo, basta substituir
+esse PNG.
 
-1. No Sensatta, pegue o **SQL** e o **`.rtm`** do report e salve em `reports/`.
+Passos para um report novo:
+
+1. No Sensatta, pegue o **SQL** e o **`.rtm`** e salve em `reports/<codigo>/`
+   como `report.sql` e `report.rtm`.
 2. **Importante — ordenação dos grupos**: o motor agrupa por quebra sequencial,
    então o `ORDER BY` do SQL **precisa começar pelos campos de grupo do `.rtm`**,
    na ordem dos grupos. Ex.: se o `.rtm` agrupa por `CODIGO_PRODUTO` e depois
