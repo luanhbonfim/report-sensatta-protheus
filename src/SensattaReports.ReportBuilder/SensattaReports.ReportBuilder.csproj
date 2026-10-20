@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Geracao de PDF (cross-platform, nao depende de System.Drawing) -->
+    <PackageReference Include="PdfSharp" Version="6.1.1" />
+    <!-- Geracao de Excel (.xlsx) -->
+    <PackageReference Include="ClosedXML" Version="0.104.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SensattaReports.Core\SensattaReports.Core.csproj" />
+  </ItemGroup>
+
+</Project>

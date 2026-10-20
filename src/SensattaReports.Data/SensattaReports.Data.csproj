@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Driver Oracle 100% gerenciado: conecta no 11g sem Oracle Client -->
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.6.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SensattaReports.Core\SensattaReports.Core.csproj" />
+  </ItemGroup>
+
+</Project>

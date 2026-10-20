@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SensattaReports.Core/SensattaReports.Core.csproj" />
+    <Project Path="src/SensattaReports.ReportBuilder/SensattaReports.ReportBuilder.csproj" />
+    <Project Path="src/SensattaReports.Data/SensattaReports.Data.csproj" />
+    <Project Path="src/SensattaReports.Api/SensattaReports.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SensattaReports.Tests/SensattaReports.Tests.csproj" />
+  </Folder>
+</Solution>

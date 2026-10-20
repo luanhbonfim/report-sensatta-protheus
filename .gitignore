@@ -1,0 +1,20 @@
+# Saidas de build do .NET
+bin/
+obj/
+out/
+publish/
+
+# Arquivos de usuario / IDE
+*.user
+.vs/
+.vscode/
+.idea/
+
+# PDFs/planilhas gerados em testes locais
+*.pdf
+*.xlsx
+!samples/**/*.pdf
+
+# Segredos locais (NUNCA versionar connection string de producao)
+appsettings.Local.json
+appsettings.*.Local.json

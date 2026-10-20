@@ -1,0 +1,4 @@
+[
+  { "name": "data_ini", "type": "Date", "required": true, "label": "Data inicial da producao" },
+  { "name": "data_fim", "type": "Date", "required": true, "label": "Data final da producao" }
+]
