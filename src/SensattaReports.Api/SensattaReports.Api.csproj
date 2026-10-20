@@ -23,4 +23,12 @@
     <ProjectReference Include="..\SensattaReports.Data\SensattaReports.Data.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Copia a pasta de reports (sql/rtm/params) para a saida, em dev e publish.
+         Assim os arquivos acompanham o servico onde quer que ele rode. -->
+    <Content Include="../../reports/**/*"
+             Link="reports/%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

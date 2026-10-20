@@ -13,7 +13,6 @@ publish/
 # PDFs/planilhas gerados em testes locais
 *.pdf
 *.xlsx
-!samples/**/*.pdf
 
 # Segredos locais (NUNCA versionar connection string de producao)
 appsettings.Local.json

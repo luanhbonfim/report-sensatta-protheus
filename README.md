@@ -47,8 +47,8 @@ Dependências: `Api → (Core, ReportBuilder, Data)`, `ReportBuilder → Core`, 
 
 ## Rodar em desenvolvimento (sem Oracle)
 
-Já vem configurado em modo **dev**: repositório lê os arquivos de `samples/` e os
-dados vêm de uma fonte **Demo** (linhas fixas). Não precisa de banco.
+Já vem configurado em modo **dev**: repositório lê os arquivos da pasta `reports/`
+e os dados vêm de uma fonte **Demo** (linhas fixas). Não precisa de banco.
 
 ```bash
 dotnet build
@@ -147,17 +147,31 @@ Erros: `404` report não encontrado, `400` parâmetro obrigatório ausente/ inv�
 
 ## Como cadastrar um novo report
 
-1. No Sensatta, pegue o **SQL** e o **`.rtm`** do report.
+Os reports ficam **versionados no Git**, como arquivos na pasta `reports/`. Para
+cada report com código `x`, crie três arquivos:
+
+- `reports/x.sql` — o SELECT, com binds `:param`
+- `reports/x.rtm` — o template do ReportBuilder
+- `reports/x.params.json` — os parâmetros (opcional)
+
+Passos:
+
+1. No Sensatta, pegue o **SQL** e o **`.rtm`** do report e salve em `reports/`.
 2. **Importante — ordenação dos grupos**: o motor agrupa por quebra sequencial,
    então o `ORDER BY` do SQL **precisa começar pelos campos de grupo do `.rtm`**,
    na ordem dos grupos. Ex.: se o `.rtm` agrupa por `CODIGO_PRODUTO` e depois
    `LOTE_EUA`, o SQL deve terminar com
    `ORDER BY CODIGO_PRODUTO, LOTE_EUA, ...`.
-3. Insira uma linha na tabela `REPORT` (código, nome, SQL, `.rtm`, parâmetros).
-4. Pronto — fica disponível em `/reports/{codigo}/pdf`. **Sem recompilar.**
+3. Commit + push. Fica disponível em `/reports/{codigo}/pdf`. **Sem recompilar** a
+   lógica — só os arquivos são copiados no build.
 
-Em dev, basta colocar `{codigo}.sql`, `{codigo}.rtm` e `{codigo}.params.json`
-na pasta `samples/`.
+> A pasta `reports/` é copiada para a saída do build/publish, então acompanha o
+> serviço onde ele rodar. Em produção, o **Oracle** serve só os dados (roda o SQL);
+> as definições continuam vindo dos arquivos.
+>
+> Alternativa: existe também um `OracleReportRepository` caso um dia você prefira
+> guardar as definições numa tabela `REPORT` no banco (basta trocar
+> `Reports:Source` para `Oracle`).
 
 ---
 

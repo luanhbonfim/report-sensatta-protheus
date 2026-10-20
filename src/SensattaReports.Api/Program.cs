@@ -90,10 +90,14 @@ static OracleOptions OracleOpts(IConfiguration cfg)
 
 static string ResolveDir(WebApplicationBuilder b)
 {
-    var dir = b.Configuration["Reports:Directory"] ?? "samples";
-    return Path.IsPathRooted(dir)
-        ? dir
-        : Path.GetFullPath(Path.Combine(b.Environment.ContentRootPath, dir));
+    // Caminho absoluto no config -> usa como esta (ex.: pasta externa em producao).
+    // Senao, resolve contra a pasta do app (onde os arquivos de reports/ sao
+    // copiados no build/publish), valendo igual em dev e em producao.
+    var dir = b.Configuration["Reports:Directory"];
+    if (!string.IsNullOrWhiteSpace(dir) && Path.IsPathRooted(dir))
+        return dir;
+    var sub = string.IsNullOrWhiteSpace(dir) ? "reports" : dir;
+    return Path.Combine(AppContext.BaseDirectory, sub);
 }
 
 // DTO do corpo do POST

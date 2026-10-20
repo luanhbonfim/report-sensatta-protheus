@@ -19,7 +19,7 @@
 
   <ItemGroup>
     <!-- Copia o .rtm de exemplo para o diretorio de saida do teste -->
-    <None Include="..\..\samples\resumo-coletas-eua.rtm" CopyToOutputDirectory="PreserveNewest" Link="samples\resumo-coletas-eua.rtm" />
+    <None Include="..\..\reports\resumo-coletas-eua.rtm" CopyToOutputDirectory="PreserveNewest" Link="reports\resumo-coletas-eua.rtm" />
   </ItemGroup>
 
 </Project>
