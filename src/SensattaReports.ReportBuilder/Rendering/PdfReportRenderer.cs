@@ -179,8 +179,10 @@ public sealed class PdfReportRenderer : IReportRenderer
             case RbImage img when img.HasImage:
                 try
                 {
-                    // Func<Stream>: o PdfSharp reabre o stream quando precisar (no Save)
-                    var image = XImage.FromStream(() => new MemoryStream(img.Jpeg));
+                    // PdfSharp 6.1 recebe o Stream diretamente. O MemoryStream sobre
+                    // um byte[] nao tem recurso nao-gerenciado; o XImage segura a
+                    // referencia, entao nao precisamos (nem devemos) descarta-lo aqui.
+                    var image = XImage.FromStream(new MemoryStream(img.Jpeg));
                     gfx.DrawImage(image, rect);
                 }
                 catch

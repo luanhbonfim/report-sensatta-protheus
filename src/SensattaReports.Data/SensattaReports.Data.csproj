@@ -9,6 +9,8 @@
   <ItemGroup>
     <!-- Driver Oracle 100% gerenciado: conecta no 11g sem Oracle Client -->
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.6.1" />
+    <!-- Fixa versao corrigida (o driver Oracle puxa a 8.0.0, com CVE) -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="9.0.0" />
   </ItemGroup>
 
   <ItemGroup>
