@@ -91,6 +91,8 @@ public sealed class RbDbText : RbElement
 public sealed class RbLine : RbElement
 {
     public double WeightPt { get; init; } = 1.0;
+    /// <summary>Borda onde a linha e desenhada: lpLeft, lpRight, lpTop, lpBottom ou vazio.</summary>
+    public string Position { get; init; } = "";
     /// <summary>true = linha horizontal; false = vertical. Derivado das dimensoes.</summary>
     public bool Horizontal => WidthMm >= HeightMm;
 }

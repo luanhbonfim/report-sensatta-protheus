@@ -103,7 +103,8 @@ public static class RbTemplateLoader
                 return new RbLine
                 {
                     LeftMm = L(), TopMm = T(), WidthMm = W(), HeightMm = H(),
-                    WeightPt = n.GetDouble("Weight", 1.0)
+                    WeightPt = n.GetDouble("Weight", 1.0),
+                    Position = n.GetString("Position")
                 };
 
             case "TppShape":

@@ -155,15 +155,16 @@ public sealed class PdfReportRenderer : IReportRenderer
 
             case RbLine line:
                 var pen = new XPen(XColors.Black, Math.Max(0.25, line.WeightPt));
-                if (line.Horizontal)
+                switch (line.Position)
                 {
-                    var yc = y + h / 2;
-                    gfx.DrawLine(pen, x, yc, x + w, yc);
-                }
-                else
-                {
-                    var xc = x + w / 2;
-                    gfx.DrawLine(pen, xc, y, xc, y + h);
+                    case "lpLeft": gfx.DrawLine(pen, x, y, x, y + h); break;
+                    case "lpRight": gfx.DrawLine(pen, x + w, y, x + w, y + h); break;
+                    case "lpTop": gfx.DrawLine(pen, x, y, x + w, y); break;
+                    case "lpBottom": gfx.DrawLine(pen, x, y + h, x + w, y + h); break;
+                    default:
+                        if (line.Horizontal) gfx.DrawLine(pen, x, y, x + w, y);     // horizontal no topo
+                        else gfx.DrawLine(pen, x, y, x, y + h);                      // vertical a esquerda
+                        break;
                 }
                 break;
 
@@ -185,9 +186,11 @@ public sealed class PdfReportRenderer : IReportRenderer
                     var image = XImage.FromStream(new MemoryStream(img.Jpeg));
                     gfx.DrawImage(image, rect);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // imagem invalida/ilegivel: ignora para nao derrubar o report
+                    // nao derruba o report; registra o motivo no console para diagnostico
+                    Console.Error.WriteLine(
+                        $"[PdfReportRenderer] Falha ao desenhar imagem ({img.Jpeg.Length} bytes): {ex.GetType().Name}: {ex.Message}");
                 }
                 break;
         }
