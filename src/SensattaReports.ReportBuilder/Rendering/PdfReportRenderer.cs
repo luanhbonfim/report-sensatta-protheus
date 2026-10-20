@@ -193,7 +193,13 @@ public sealed class PdfReportRenderer : IReportRenderer
                 {
                     try
                     {
-                        var image = XImage.FromStream(new MemoryStream(imgBytes));
+                        // publiclyVisible: true permite que o PdfSharp acesse o buffer
+                        // interno (GetBuffer) ao salvar — sem isso da
+                        // UnauthorizedAccessException. O stream NAO e descartado aqui
+                        // porque o PdfSharp o le de forma preguicosa no doc.Save.
+                        var ms = new MemoryStream(imgBytes, 0, imgBytes.Length,
+                            writable: false, publiclyVisible: true);
+                        var image = XImage.FromStream(ms);
                         gfx.DrawImage(image, rect);
                     }
                     catch (Exception ex)
