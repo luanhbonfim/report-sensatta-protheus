@@ -6,6 +6,10 @@ using SensattaReports.ReportBuilder.Rendering;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Config local (senha do Oracle etc.) que NAO vai para o Git (gitignore).
+// Sobrepoe o appsettings.json. Opcional: se nao existir, segue sem erro.
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+
 // Permite rodar como Servico do Windows (producao) ou daemon systemd (Linux).
 // Ambos sao no-op quando rodando como console em desenvolvimento.
 builder.Host.UseWindowsService();
