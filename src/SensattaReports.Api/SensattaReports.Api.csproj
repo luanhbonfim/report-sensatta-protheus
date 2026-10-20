@@ -13,8 +13,8 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.0" />
     <!-- Permite rodar como daemon systemd no Linux -->
     <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="10.0.0" />
-    <!-- Fixa versao corrigida (dependencia transitiva do driver Oracle, com CVE) -->
-    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="9.0.0" />
+    <!-- Fixa versao corrigida do CVE-2026-84008 (dep. transitiva do driver Oracle) -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
 
   <ItemGroup>
