@@ -28,8 +28,11 @@ else
     builder.Services.AddSingleton<IReportRepository>(_ =>
         new FileReportRepository(ResolveDir(builder)));
 
-// --- Fonte de dados: Oracle (producao) ou Demo (dev, sem banco) ----------
-var dataSource = builder.Configuration["Data:Source"] ?? "Demo";
+// --- Fonte de dados: Oracle ou Demo --------------------------------------
+// Se houver connection string do Oracle, usa Oracle automaticamente; senao,
+// usa a fonte Demo (dev, sem banco). Da para forcar com Data:Source.
+var temOracle = !string.IsNullOrWhiteSpace(builder.Configuration["Oracle:ConnectionString"]);
+var dataSource = builder.Configuration["Data:Source"] ?? (temOracle ? "Oracle" : "Demo");
 if (dataSource.Equals("Oracle", StringComparison.OrdinalIgnoreCase))
     builder.Services.AddSingleton<IReportDataSource>(_ =>
         new OracleReportDataSource(OracleOpts(builder.Configuration)));
