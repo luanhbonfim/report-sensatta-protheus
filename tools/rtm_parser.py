@@ -88,6 +88,12 @@ class DfmParser:
         rest = rest.strip()
         self.i += 1
 
+        # DFM quebra valores longos para a linha seguinte: "Caption =" e o valor
+        # comeca na proxima linha. Se nada vem depois do '=', puxa a proxima.
+        if rest == "" and self.i < len(self.lines):
+            rest = self.lines[self.i].strip()
+            self.i += 1
+
         # bloco binario: valor comeca com '{' -> acumula hex ate achar '}'
         if rest.startswith("{"):
             return key, self._read_binary(rest)

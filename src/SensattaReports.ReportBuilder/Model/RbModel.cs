@@ -87,6 +87,41 @@ public sealed class RbDbText : RbElement
     public RbAlignment Alignment { get; init; } = RbAlignment.Left;
 }
 
+/// <summary>
+/// Campo multi-linha ligado a uma coluna do dataset (TppDBMemo). Quebra o texto
+/// em varias linhas; com Stretch a altura cresce conforme o conteudo.
+/// </summary>
+public sealed class RbDbMemo : RbElement
+{
+    public string DataField { get; init; } = string.Empty;
+    public RbFont Font { get; init; } = new();
+    public RbAlignment Alignment { get; init; } = RbAlignment.Left;
+    /// <summary>true = a altura acompanha o conteudo (phDynamic).</summary>
+    public bool Stretch { get; init; }
+    /// <summary>true = quebra palavras longas (CharWrap).</summary>
+    public bool CharWrap { get; init; }
+}
+
+/// <summary>Tipo de variavel de sistema do ReportBuilder.</summary>
+public enum RbSysVarType
+{
+    DateTime,     // vtDateTime
+    Date,         // vtDate / vtPrintDate
+    Time,         // vtTime
+    PageNo,       // vtPageNo
+    PageCount,    // vtPageCount
+    PageSetDesc,  // vtPageSetDesc  ("Pagina X de Y")
+    Other
+}
+
+/// <summary>Variavel de sistema (TppSystemVariable): data/hora, numero de pagina...</summary>
+public sealed class RbSystemVariable : RbElement
+{
+    public RbSysVarType VarType { get; init; } = RbSysVarType.Other;
+    public RbFont Font { get; init; } = new();
+    public RbAlignment Alignment { get; init; } = RbAlignment.Left;
+}
+
 /// <summary>Linha (TppLine).</summary>
 public sealed class RbLine : RbElement
 {
@@ -127,6 +162,8 @@ public sealed class RbBand
 {
     public RbBandKind Kind { get; init; }
     public double HeightMm { get; init; }
+    /// <summary>true = altura dinamica (phDynamic): acompanha o conteudo (memos esticados).</summary>
+    public bool Dynamic { get; init; }
     public List<RbElement> Elements { get; } = [];
 }
 
@@ -136,6 +173,8 @@ public sealed class RbGroup
     public string BreakField { get; init; } = string.Empty;
     public RbBand? Header { get; init; }
     public RbBand? Footer { get; init; }
+    /// <summary>true = quebra pagina a cada troca deste grupo (NewPage).</summary>
+    public bool NewPage { get; init; }
 }
 
 /// <summary>O template inteiro, pronto para o renderizador consumir.</summary>

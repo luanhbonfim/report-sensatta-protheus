@@ -1,3 +1,4 @@
+using System.Text;
 using PdfSharp.Drawing;
 using PdfSharp.Fonts;
 using PdfSharp.Pdf;
@@ -9,27 +10,30 @@ namespace SensattaReports.ReportBuilder.Rendering;
 
 /// <summary>
 /// Gera o PDF a partir do template .rtm + dados, reproduzindo o layout de
-/// bandas do ReportBuilder: cabecalho no topo de cada pagina, cabecalho de
-/// grupo na quebra, uma banda de detalhe por linha, com quebra de pagina.
+/// bandas do ReportBuilder: cabecalho no topo de cada pagina, cabecalhos de
+/// grupo na quebra, uma banda de detalhe por linha, rodapes de grupo com
+/// subtotais, memos multi-linha que fluem entre paginas, e rodape fixo no pe
+/// da pagina com data/hora e numero de pagina.
 /// </summary>
 public sealed class PdfReportRenderer : IReportRenderer
 {
     static PdfReportRenderer()
     {
-        // registra o resolvedor de fontes uma unica vez
         GlobalFontSettings.FontResolver ??= new SimpleFontResolver();
     }
 
     private readonly byte[]? _logo;
 
     /// <summary>
-    /// logoPng: imagem (PNG/JPEG) usada no lugar das imagens do .rtm — a logo
-    /// generica, desenhada na posicao que cada template define. Se null, usa a
-    /// imagem embutida no proprio .rtm.
+    /// logoPng: imagem (PNG/JPEG) usada no lugar das imagens do .rtm. Se null,
+    /// usa a imagem embutida no proprio .rtm.
     /// </summary>
     public PdfReportRenderer(byte[]? logoPng = null) => _logo = logoPng;
 
     public ReportFormat Format => ReportFormat.Pdf;
+
+    /// <summary>Numero da pagina atual / total — para as variaveis de sistema do rodape.</summary>
+    private readonly record struct PageInfo(int Number, int Total);
 
     public ReportOutput Render(ReportDefinition definition, ReportDataSet data)
     {
@@ -38,10 +42,13 @@ public sealed class PdfReportRenderer : IReportRenderer
         using var doc = new PdfDocument();
         doc.Info.Title = definition.Nome;
 
-        var contentHeightMm = tpl.ContentHeightMm;
+        // o rodape de pagina ocupa um espaco reservado no pe de cada pagina
+        var footerHeightMm = tpl.FooterBand?.HeightMm ?? 0;
+        var contentHeightMm = tpl.ContentHeightMm - footerHeightMm;
+
         XGraphics gfx = null!;
         var cursorY = 0.0;                 // mm a partir do topo da area util
-        object?[]? currentGroupRow = null; // linha vigente, p/ reimprimir grupo na quebra de pagina
+        object?[]? currentGroupRow = null; // linha vigente, p/ reimprimir grupos na quebra de pagina
 
         PdfPage AddPage()
         {
@@ -51,6 +58,7 @@ public sealed class PdfReportRenderer : IReportRenderer
             return p;
         }
 
+        // abre uma nova pagina e imprime a banda de cabecalho (topo)
         void StartPage()
         {
             gfx?.Dispose();
@@ -58,38 +66,43 @@ public sealed class PdfReportRenderer : IReportRenderer
             cursorY = 0;
             if (tpl.HeaderBand is { } h)
             {
-                DrawBand(gfx, tpl, h, cursorY, null, data);
+                DrawBand(gfx, tpl, h, cursorY, null, data, default);
                 cursorY += h.HeightMm;
             }
         }
 
-        void EnsureSpace(double needMm)
+        // quebra de pagina reimprimindo os cabecalhos de grupo vigentes
+        void ReprintGroupHeaders()
+        {
+            if (currentGroupRow is null) return;
+            foreach (var g in tpl.Groups)
+                if (g.Header is { } gh)
+                {
+                    DrawBand(gfx, tpl, gh, cursorY, currentGroupRow, data, default);
+                    cursorY += gh.HeightMm;
+                }
+        }
+
+        // garante espaco; se nao couber, nova pagina (reimprimindo grupos, opcional)
+        void EnsureSpace(double needMm, bool reprintGroups)
         {
             if (cursorY + needMm <= contentHeightMm) return;
             StartPage();
-            // reimprime os cabecalhos de grupo vigentes na nova pagina
-            if (currentGroupRow is not null)
-                foreach (var g in tpl.Groups)
-                    if (g.Header is { } gh)
-                    {
-                        DrawBand(gfx, tpl, gh, cursorY, currentGroupRow, data);
-                        cursorY += gh.HeightMm;
-                    }
+            if (reprintGroups) ReprintGroupHeaders();
         }
 
         StartPage();
 
         var prevKeys = new string?[tpl.Groups.Count];
         var first = true;
+        object?[]? lastRow = null;
 
         foreach (var row in data.Rows)
         {
-            // valores atuais das chaves de grupo
             var keys = new string?[tpl.Groups.Count];
             for (var gi = 0; gi < tpl.Groups.Count; gi++)
                 keys[gi] = data.GetString(row, tpl.Groups[gi].BreakField);
 
-            // a partir de qual grupo houve quebra?
             var breakFrom = -1;
             if (first)
                 breakFrom = tpl.Groups.Count > 0 ? 0 : -1;
@@ -103,11 +116,27 @@ public sealed class PdfReportRenderer : IReportRenderer
 
             if (breakFrom >= 0)
             {
+                // 1. fecha os grupos que terminaram: rodapes, do mais interno p/ o mais externo
+                if (!first)
+                    for (var gi = tpl.Groups.Count - 1; gi >= breakFrom; gi--)
+                        EmitGroupFooter(tpl.Groups[gi], lastRow);
+
+                // 2. quebra de pagina se algum grupo que vai (re)abrir tem NewPage
+                var wantNewPage = !first &&
+                    Enumerable.Range(breakFrom, tpl.Groups.Count - breakFrom)
+                              .Any(gi => tpl.Groups[gi].NewPage);
+                if (wantNewPage)
+                {
+                    currentGroupRow = null; // pagina nova: nao reimprime grupos antigos
+                    StartPage();
+                }
+
+                // 3. abre os novos grupos: cabecalhos, do mais externo p/ o mais interno
                 for (var gi = breakFrom; gi < tpl.Groups.Count; gi++)
                     if (tpl.Groups[gi].Header is { } gh)
                     {
-                        EnsureSpace(gh.HeightMm);
-                        DrawBand(gfx, tpl, gh, cursorY, row, data);
+                        EnsureSpace(gh.HeightMm, reprintGroups: true);
+                        DrawBand(gfx, tpl, gh, cursorY, row, data, default);
                         cursorY += gh.HeightMm;
                     }
                 currentGroupRow = row;
@@ -115,16 +144,33 @@ public sealed class PdfReportRenderer : IReportRenderer
 
             prevKeys = keys;
             first = false;
+            lastRow = row;
 
             if (tpl.DetailBand is { } d)
-            {
-                EnsureSpace(d.HeightMm);
-                DrawBand(gfx, tpl, d, cursorY, row, data);
-                cursorY += d.HeightMm;
-            }
+                EmitDetail(d, row);
         }
 
+        // rodapes finais dos grupos ainda abertos (do mais interno p/ o mais externo)
+        if (lastRow is not null)
+            for (var gi = tpl.Groups.Count - 1; gi >= 0; gi--)
+                EmitGroupFooter(tpl.Groups[gi], lastRow);
+
         gfx?.Dispose();
+
+        // segunda passada: desenha o rodape de pagina no pe de cada pagina,
+        // agora que o total de paginas e conhecido (p/ "Pagina X de Y")
+        if (tpl.FooterBand is { } footer)
+        {
+            var total = doc.PageCount;
+            var footerTopMm = tpl.PageHeightMm - tpl.MarginBottomMm - footerHeightMm;
+            for (var i = 0; i < total; i++)
+            {
+                using var fg = XGraphics.FromPdfPage(doc.Pages[i], XGraphicsPdfPageOptions.Append);
+                // DrawBand soma MarginTop + bandTop; passamos o topo absoluto descontando a margem
+                DrawBand(fg, tpl, footer, footerTopMm - tpl.MarginTopMm, null, data,
+                    new PageInfo(i + 1, total));
+            }
+        }
 
         using var ms = new MemoryStream();
         doc.Save(ms);
@@ -134,21 +180,129 @@ public sealed class PdfReportRenderer : IReportRenderer
             ContentType = ReportOutput.ContentTypeFor(ReportFormat.Pdf),
             FileName = definition.NomeArquivo + ReportOutput.ExtensionFor(ReportFormat.Pdf)
         };
+
+        // ---- helpers locais (fecham sobre gfx/cursorY/...) ----
+
+        void EmitGroupFooter(RbGroup g, object?[]? row)
+        {
+            if (g.Footer is not { } f || f.Elements.Count == 0) return;
+            var h = BandHeight(gfx, tpl, f, row, data);
+            if (h <= 0) return;
+            EnsureSpace(h, reprintGroups: false);
+            DrawBand(gfx, tpl, f, cursorY, row, data, default);
+            cursorY += h;
+        }
+
+        void EmitDetail(RbBand d, object?[] row)
+        {
+            var memo = d.Elements.OfType<RbDbMemo>().FirstOrDefault(m => m.Stretch);
+            if (memo is null)
+            {
+                var h = BandHeight(gfx, tpl, d, row, data);
+                EnsureSpace(h, reprintGroups: true);
+                DrawBand(gfx, tpl, d, cursorY, row, data, default);
+                cursorY += h;
+                return;
+            }
+
+            // detalhe com memo esticado: parte estatica desenhada uma vez,
+            // e as linhas do memo fluindo entre paginas
+            var memoText = data.GetString(row, memo.DataField);
+            var font = BuildFont(memo.Font);
+            var widthPt = XUnit.FromMillimeter(memo.WidthMm).Point;
+            var lines = WrapLines(gfx, memoText, font, widthPt, memo.CharWrap);
+            var lineHmm = XUnit.FromPoint(font.GetHeight()).Millimeter;
+
+            // altura da parte nao-memo (labels, descricao) acima/ao lado do memo
+            var staticBottom = d.Elements.Where(e => e is not RbDbMemo)
+                                         .Select(e => e.TopMm + e.HeightMm)
+                                         .DefaultIfEmpty(0).Max();
+
+            // garante espaco p/ a parte estatica + inicio do memo (ao menos 1 linha)
+            EnsureSpace(Math.Max(staticBottom, memo.TopMm + lineHmm), reprintGroups: true);
+
+            // elementos fixos do detalhe (uma vez, no inicio da ocorrencia)
+            foreach (var el in d.Elements)
+                if (el is not RbDbMemo)
+                {
+                    var xMm = tpl.MarginLeftMm + el.LeftMm;
+                    var yMm = tpl.MarginTopMm + cursorY + el.TopMm;
+                    DrawElement(gfx, el, xMm, yMm, row, data, default);
+                }
+
+            var startY = cursorY;
+            var memoY = cursorY + memo.TopMm;
+            var memoXmm = tpl.MarginLeftMm + memo.LeftMm;
+            foreach (var ln in lines)
+            {
+                if (memoY + lineHmm > contentHeightMm)
+                {
+                    StartPage();
+                    ReprintGroupHeaders();
+                    memoY = cursorY;
+                }
+                if (ln.Length > 0)
+                {
+                    var rectMm = new XRect(
+                        XUnit.FromMillimeter(memoXmm).Point,
+                        XUnit.FromMillimeter(tpl.MarginTopMm + memoY).Point,
+                        widthPt,
+                        XUnit.FromMillimeter(lineHmm).Point);
+                    DrawText(gfx, ln, memo.Font, memo.Alignment, rectMm);
+                }
+                memoY += lineHmm;
+            }
+
+            cursorY = Math.Max(memoY, startY + staticBottom);
+        }
+    }
+
+    /// <summary>
+    /// Altura efetiva de uma banda. Bandas fixas usam a altura de projeto.
+    /// Bandas dinamicas sem memo esticado tambem (o layout e fixo); so quando
+    /// ha um memo esticado a altura e medida pelo conteudo.
+    /// </summary>
+    private double BandHeight(XGraphics gfx, RbTemplate tpl, RbBand band,
+        object?[]? row, ReportDataSet data)
+    {
+        var hasStretchMemo = band.Elements.Any(e => e is RbDbMemo { Stretch: true });
+        if (!band.Dynamic || !hasStretchMemo) return band.HeightMm;
+
+        var h = 0.0;
+        foreach (var el in band.Elements)
+        {
+            double bottom;
+            if (el is RbDbMemo memo && row is not null)
+            {
+                var text = data.GetString(row, memo.DataField);
+                var font = BuildFont(memo.Font);
+                var widthPt = XUnit.FromMillimeter(memo.WidthMm).Point;
+                var lines = WrapLines(gfx, text, font, widthPt, memo.CharWrap);
+                var lineHmm = XUnit.FromPoint(font.GetHeight()).Millimeter;
+                bottom = el.TopMm + Math.Max(lines.Count, 1) * lineHmm;
+            }
+            else
+            {
+                bottom = el.TopMm + el.HeightMm;
+            }
+            h = Math.Max(h, bottom);
+        }
+        return h;
     }
 
     private void DrawBand(XGraphics gfx, RbTemplate tpl, RbBand band,
-        double bandTopMm, object?[]? row, ReportDataSet data)
+        double bandTopMm, object?[]? row, ReportDataSet data, PageInfo page)
     {
         foreach (var el in band.Elements)
         {
             var xMm = tpl.MarginLeftMm + el.LeftMm;
             var yMm = tpl.MarginTopMm + bandTopMm + el.TopMm;
-            DrawElement(gfx, el, xMm, yMm, row, data);
+            DrawElement(gfx, el, xMm, yMm, row, data, page);
         }
     }
 
     private void DrawElement(XGraphics gfx, RbElement el,
-        double xMm, double yMm, object?[]? row, ReportDataSet data)
+        double xMm, double yMm, object?[]? row, ReportDataSet data, PageInfo page)
     {
         var x = XUnit.FromMillimeter(xMm).Point;
         var y = XUnit.FromMillimeter(yMm).Point;
@@ -171,8 +325,8 @@ public sealed class PdfReportRenderer : IReportRenderer
                     case "lpTop": gfx.DrawLine(pen, x, y, x + w, y); break;
                     case "lpBottom": gfx.DrawLine(pen, x, y + h, x + w, y + h); break;
                     default:
-                        if (line.Horizontal) gfx.DrawLine(pen, x, y, x + w, y);     // horizontal no topo
-                        else gfx.DrawLine(pen, x, y, x, y + h);                      // vertical a esquerda
+                        if (line.Horizontal) gfx.DrawLine(pen, x, y, x + w, y);
+                        else gfx.DrawLine(pen, x, y, x, y + h);
                         break;
                 }
                 break;
@@ -186,17 +340,37 @@ public sealed class PdfReportRenderer : IReportRenderer
                 DrawText(gfx, text, db.Font, db.Alignment, rect);
                 break;
 
+            case RbSystemVariable sv:
+                DrawText(gfx, SystemVarText(sv.VarType, page), sv.Font, sv.Alignment, rect);
+                break;
+
+            case RbDbMemo memo:
+                // memos esticados sao tratados no fluxo do detalhe (EmitDetail);
+                // aqui atende memos de altura fixa (raro) desenhando as linhas que couberem
+                var mtext = row is not null ? data.GetString(row, memo.DataField) : string.Empty;
+                if (!string.IsNullOrEmpty(mtext))
+                {
+                    var font = BuildFont(memo.Font);
+                    var lines = WrapLines(gfx, mtext, font, w, memo.CharWrap);
+                    var lineHpt = font.GetHeight();
+                    var yy = y;
+                    foreach (var ln in lines)
+                    {
+                        if (yy + lineHpt > y + h && h > 0) break;
+                        if (ln.Length > 0)
+                            DrawText(gfx, ln, memo.Font, memo.Alignment,
+                                new XRect(x, yy, w, lineHpt));
+                        yy += lineHpt;
+                    }
+                }
+                break;
+
             case RbImage img:
-                // prioriza a logo generica; se nao houver, usa a imagem do .rtm
                 var imgBytes = _logo ?? (img.HasImage ? img.Jpeg : null);
                 if (imgBytes is not null)
                 {
                     try
                     {
-                        // publiclyVisible: true permite que o PdfSharp acesse o buffer
-                        // interno (GetBuffer) ao salvar — sem isso da
-                        // UnauthorizedAccessException. O stream NAO e descartado aqui
-                        // porque o PdfSharp o le de forma preguicosa no doc.Save.
                         var ms = new MemoryStream(imgBytes, 0, imgBytes.Length,
                             writable: false, publiclyVisible: true);
                         var image = XImage.FromStream(ms);
@@ -204,7 +378,6 @@ public sealed class PdfReportRenderer : IReportRenderer
                     }
                     catch (Exception ex)
                     {
-                        // nao derruba o report; registra o motivo no console para diagnostico
                         Console.Error.WriteLine(
                             $"[PdfReportRenderer] Falha ao desenhar imagem ({imgBytes.Length} bytes): {ex.GetType().Name}: {ex.Message}");
                     }
@@ -213,16 +386,64 @@ public sealed class PdfReportRenderer : IReportRenderer
         }
     }
 
-    private static void DrawText(XGraphics gfx, string text, RbFont f, RbAlignment align, XRect rect)
+    private static string SystemVarText(RbSysVarType type, PageInfo page) => type switch
     {
-        if (string.IsNullOrEmpty(text)) return;
+        RbSysVarType.DateTime => DateTime.Now.ToString("dd/MM/yyyy HH:mm"),
+        RbSysVarType.Date => DateTime.Now.ToString("dd/MM/yyyy"),
+        RbSysVarType.Time => DateTime.Now.ToString("HH:mm:ss"),
+        RbSysVarType.PageNo => page.Number.ToString(),
+        RbSysVarType.PageCount => page.Total.ToString(),
+        RbSysVarType.PageSetDesc => $"Página {page.Number} de {page.Total}",
+        _ => string.Empty
+    };
 
+    /// <summary>Quebra o texto em linhas respeitando a largura (word-wrap) e os \n.</summary>
+    private static List<string> WrapLines(XGraphics gfx, string text, XFont font,
+        double maxWidthPt, bool charWrap)
+    {
+        var result = new List<string>();
+        if (string.IsNullOrEmpty(text)) return result;
+
+        text = text.Replace("\r\n", "\n").Replace('\r', '\n');
+        foreach (var para in text.Split('\n'))
+        {
+            if (para.Length == 0) { result.Add(string.Empty); continue; }
+
+            var line = new StringBuilder();
+            foreach (var word in para.Split(' '))
+            {
+                var trial = line.Length == 0 ? word : line + " " + word;
+                if (line.Length == 0 || gfx.MeasureString(trial, font).Width <= maxWidthPt)
+                {
+                    if (line.Length > 0) line.Append(' ');
+                    line.Append(word);
+                }
+                else
+                {
+                    result.Add(line.ToString());
+                    line.Clear();
+                    line.Append(word);
+                }
+            }
+            result.Add(line.ToString());
+        }
+        return result;
+    }
+
+    private static XFont BuildFont(RbFont f)
+    {
         var style = XFontStyleEx.Regular;
         if (f.Bold) style |= XFontStyleEx.Bold;
         if (f.Italic) style |= XFontStyleEx.Italic;
         if (f.Underline) style |= XFontStyleEx.Underline;
+        return new XFont(f.Name, f.SizePt, style);
+    }
 
-        var font = new XFont(f.Name, f.SizePt, style);
+    private static void DrawText(XGraphics gfx, string text, RbFont f, RbAlignment align, XRect rect)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+
+        var font = BuildFont(f);
         var brush = new XSolidBrush(ToXColor(f.Color));
         var fmt = new XStringFormat
         {

@@ -1,0 +1,14 @@
+[
+  {
+    "name": "romaneio_inicial",
+    "type": "Integer",
+    "required": true,
+    "label": "Romaneio inicial"
+  },
+  {
+    "name": "romaneio_final",
+    "type": "Integer",
+    "required": true,
+    "label": "Romaneio final"
+  }
+]

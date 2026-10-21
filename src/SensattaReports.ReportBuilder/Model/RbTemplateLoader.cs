@@ -38,7 +38,8 @@ public static class RbTemplateLoader
             {
                 BreakField = g.GetString("BreakName"),
                 Header = header,
-                Footer = footer
+                Footer = footer,
+                NewPage = g.GetBool("NewPage")
             });
         }
 
@@ -63,7 +64,12 @@ public static class RbTemplateLoader
 
     private static RbBand LoadBand(DfmNode band, RbBandKind kind)
     {
-        var result = new RbBand { Kind = kind, HeightMm = Mm(band.GetInt("mmHeight")) };
+        var result = new RbBand
+        {
+            Kind = kind,
+            HeightMm = Mm(band.GetInt("mmHeight")),
+            Dynamic = band.GetString("PrintHeight").Equals("phDynamic", StringComparison.OrdinalIgnoreCase)
+        };
         foreach (var el in band.Children)
         {
             var element = LoadElement(el);
@@ -95,6 +101,26 @@ public static class RbTemplateLoader
                 {
                     LeftMm = L(), TopMm = T(), WidthMm = W(), HeightMm = H(),
                     DataField = n.GetString("DataField"),
+                    Font = LoadFont(n),
+                    Alignment = Align(n.GetString("TextAlignment"))
+                };
+
+            case "TppDBMemo":
+                return new RbDbMemo
+                {
+                    LeftMm = L(), TopMm = T(), WidthMm = W(), HeightMm = H(),
+                    DataField = n.GetString("DataField"),
+                    Font = LoadFont(n),
+                    Alignment = Align(n.GetString("TextAlignment")),
+                    Stretch = n.GetBool("Stretch"),
+                    CharWrap = n.GetBool("CharWrap")
+                };
+
+            case "TppSystemVariable":
+                return new RbSystemVariable
+                {
+                    LeftMm = L(), TopMm = T(), WidthMm = W(), HeightMm = H(),
+                    VarType = SysVar(n.GetString("VarType")),
                     Font = LoadFont(n),
                     Alignment = Align(n.GetString("TextAlignment"))
                 };
@@ -135,6 +161,17 @@ public static class RbTemplateLoader
         Italic = n.HasFlag("Font.Style", "fsItalic"),
         Underline = n.HasFlag("Font.Style", "fsUnderline"),
         Color = RbColor.Parse(n.GetString("Font.Color", "clBlack"))
+    };
+
+    private static RbSysVarType SysVar(string vt) => vt switch
+    {
+        "vtDateTime" => RbSysVarType.DateTime,
+        "vtDate" or "vtPrintDate" => RbSysVarType.Date,
+        "vtTime" => RbSysVarType.Time,
+        "vtPageNo" or "vtPageNoDesc" => RbSysVarType.PageNo,
+        "vtPageCount" or "vtPageCountDesc" => RbSysVarType.PageCount,
+        "vtPageSetDesc" or "vtPageSet" => RbSysVarType.PageSetDesc,
+        _ => RbSysVarType.Other
     };
 
     private static RbAlignment Align(string ta) => ta switch

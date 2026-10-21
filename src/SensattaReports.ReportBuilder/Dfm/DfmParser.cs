@@ -86,6 +86,20 @@ public sealed partial class DfmParser
         var rest = s[(eq + 1)..].Trim();
         _i++;
 
+        // DFM quebra valores longos (tipicamente strings) para a linha seguinte:
+        //   Caption =
+        //     'texto longo'
+        // Quando nada vem depois do '=', o valor comeca na proxima linha.
+        if (rest.Length == 0)
+        {
+            var next = Peek();
+            if (next is not null)
+            {
+                rest = next.Trim();
+                _i++;
+            }
+        }
+
         if (rest.StartsWith('{')) return (key, ReadBinary(rest));
         if (rest.StartsWith('<')) return (key, ReadCollection(rest));
         if (rest.StartsWith('\'') || rest.StartsWith('#')) return (key, ReadString(rest));

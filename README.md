@@ -299,6 +299,29 @@ Por padrão escuta em `http://0.0.0.0:5080` (ajuste em `Urls`).
 
 ## Componentes já suportados do `.rtm`
 
-`TppLabel`, `TppDBText`, `TppLine`, `TppShape`, `TppImage`, bandas de cabeçalho,
-detalhe, rodapé e grupo (cabeçalho/rodapé). Outros componentes (totais,
-subrelatórios, código de barras) podem ser adicionados conforme a necessidade.
+- **Elementos:** `TppLabel`, `TppDBText`, `TppDBMemo` (texto multi-linha que
+  quebra e flui entre páginas), `TppSystemVariable` (data/hora e número de
+  página — `vtDateTime`, `vtDate`, `vtTime`, `vtPageNo`, `vtPageCount`,
+  `vtPageSetDesc`), `TppLine`, `TppShape`, `TppImage`.
+- **Bandas:** cabeçalho, detalhe, rodapé (fixado no pé de cada página, com o
+  número de página calculado em segunda passada), resumo e **vários grupos
+  aninhados** com cabeçalho e **rodapé de grupo (subtotais)**.
+- **Grupos:** quebra por campo (`BreakName`), `NewPage` (quebra de página a cada
+  troca do grupo) e bandas `phDynamic` (altura acompanha o conteúdo).
+
+Outros componentes (subrelatórios, código de barras) podem ser adicionados
+conforme a necessidade.
+
+### Exemplos incluídos
+
+| Código | Nome | Características |
+|---|---|---|
+| `resumo-coletas-eua` | Resumo de Coletas EUA | A4 paisagem, 1 grupo, logo |
+| `romaneio-embarque-v2` | Romaneio de Embarque V2 | A4 retrato, 3 grupos aninhados, rodapés com subtotais, memo e número de página |
+
+> **Nota sobre o `romaneio-embarque-v2`:** o `.rtm` usa um único *pipeline*
+> (`rbpl_relatorio`); os subtotais (`TOTAL_PEDIDO_*`, `QTDE_COMPOSICAO`, ...) são
+> colunas do próprio `SELECT` (funções de janela), desenhadas nos rodapés de
+> grupo. O memo `TST` (lista de itens/peças da composição) é uma coluna de texto
+> que precisa ser montada no SQL; enquanto ela não existir no retorno, o memo
+> aparece vazio — o resto do layout é fiel.
