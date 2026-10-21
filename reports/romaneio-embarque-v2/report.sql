@@ -19,9 +19,7 @@ SELECT /*PRG #6179*/  V.SEQUENCIAL_ROMANEIO,
        V.DESCRICAO_PRODUTO,
        V.SEQUENCIAL_PRODUTO,
        REGEXP_REPLACE(
-         REPLACE(
-           LTRIM(REGEXP_REPLACE(better.concatena_seqembarque(V.sequencial_item_pedido,V.sequencial_romaneio), '#0*', ' / '), ' /'),
-         '-', ' - '),
+         LTRIM(REGEXP_REPLACE(better.concatena_seqembarque(V.sequencial_item_pedido,V.sequencial_romaneio), '#[0-9]+-', ' / 1 - '), ' /'),
          '(([^/]+/ ){10})', '\1' || CHR(10)) tst,
        V.DATA_SAIDA_NF,
        SUM(SUM(V.QTDE_COMPOSICAO)) OVER(PARTITION BY V.SEQUENCIAL_ROMANEIO,V.SEQUENCIAL_PEDIDO,V.CODIGO_PRODUTO ORDER BY V.SEQUENCIAL_ROMANEIO,V.SEQUENCIAL_PEDIDO,V.CODIGO_PRODUTO) QTDE_COMPOSICAO,
