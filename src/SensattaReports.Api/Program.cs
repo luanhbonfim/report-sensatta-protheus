@@ -200,8 +200,14 @@ static async Task<IResult> Generate(string codigo, ReportFormat fmt,
     }
     catch (Exception e)
     {
-        Reg(false, 500, e.Message);
-        return Results.Problem(e.Message);
+        // loga a excecao completa (tipo + stack + inner) no console do servico,
+        // para diagnosticar erros de SQL/Oracle/renderizacao
+        Console.Error.WriteLine($"[Generate] {codigo} ({fmt}) falhou: {e}");
+        Reg(false, 500, $"{e.GetType().Name}: {e.Message}");
+        return Results.Problem(
+            detail: e.ToString(),
+            title: $"{e.GetType().Name} ao gerar '{codigo}'",
+            statusCode: 500);
     }
 }
 

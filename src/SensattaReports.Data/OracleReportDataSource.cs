@@ -1,4 +1,5 @@
 using Oracle.ManagedDataAccess.Client;
+using Oracle.ManagedDataAccess.Types;
 using SensattaReports.Core.Abstractions;
 using SensattaReports.Core.Models;
 
@@ -36,7 +37,7 @@ public sealed class OracleReportDataSource(OracleOptions options) : IReportDataS
             cmd.Parameters.Add(p);
         }
 
-        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        await using var reader = (OracleDataReader)await cmd.ExecuteReaderAsync(ct);
 
         var cols = new string[reader.FieldCount];
         for (var i = 0; i < reader.FieldCount; i++)
@@ -47,13 +48,54 @@ public sealed class OracleReportDataSource(OracleOptions options) : IReportDataS
         {
             var row = new object?[reader.FieldCount];
             for (var i = 0; i < reader.FieldCount; i++)
-            {
-                var v = reader.GetValue(i);
-                row[i] = v is DBNull ? null : v;
-            }
+                row[i] = ReadCell(reader, i);
             rows.Add(row);
         }
 
         return new ReportDataSet(cols, rows);
+    }
+
+    /// <summary>
+    /// Le uma celula de forma robusta. O caminho normal (GetValue) atende quase
+    /// tudo; colunas NUMBER calculadas (SUM/AVG/janelas sem CAST) vem como
+    /// OracleDecimal de precisao alta e estouram a conversao para decimal
+    /// ("Specified cast is not valid"). Nesse caso arredondamos o OracleDecimal
+    /// para uma precisao que cabe em decimal.
+    /// </summary>
+    private static object? ReadCell(OracleDataReader reader, int i)
+    {
+        try
+        {
+            var v = reader.GetValue(i);
+            return v is DBNull ? null : v;
+        }
+        catch (Exception) // InvalidCast / Overflow em NUMBER sem precisao definida
+        {
+            var ov = reader.GetOracleValue(i);
+            return NormalizeOracle(ov);
+        }
+    }
+
+    private static object? NormalizeOracle(object? ov) => ov switch
+    {
+        null => null,
+        OracleDecimal d when d.IsNull => null,
+        OracleDecimal d => SafeDecimal(d),
+        OracleString s => s.IsNull ? null : s.Value,
+        OracleClob c => c.IsNull ? null : c.Value,
+        OracleDate od => od.IsNull ? null : (object)od.Value,
+        OracleTimeStamp ts => ts.IsNull ? null : (object)ts.Value,
+        _ => ov.ToString()
+    };
+
+    private static object SafeDecimal(OracleDecimal d)
+    {
+        // arredonda para 28 digitos significativos (limite do System.Decimal)
+        try { return OracleDecimal.SetPrecision(d, 28).Value; }
+        catch
+        {
+            try { return (double)d; }
+            catch { return d.ToString(); }
+        }
     }
 }
