@@ -9,27 +9,49 @@ namespace SensattaReports.Core;
 /// 1) busca a definicao  2) valida/converte os parametros
 /// 3) roda o SQL no Oracle  4) renderiza no formato pedido.
 /// </summary>
-public sealed class ReportService(
-    IReportRepository repository,
-    IReportDataSource dataSource,
-    IEnumerable<IReportRenderer> renderers)
+public sealed class ReportService
 {
-    private readonly IReadOnlyDictionary<ReportFormat, IReportRenderer> _renderers =
-        renderers.ToDictionary(r => r.Format);
+    private readonly IReportRepository _repository;
+    private readonly IReportDataSource _dataSource;
+    private readonly IReadOnlyDictionary<ReportFormat, IReportRenderer> _renderers;
+    private readonly SemaphoreSlim _gate;
+
+    public ReportService(
+        IReportRepository repository,
+        IReportDataSource dataSource,
+        IEnumerable<IReportRenderer> renderers,
+        ReportServiceOptions? options = null)
+    {
+        _repository = repository;
+        _dataSource = dataSource;
+        _renderers = renderers.ToDictionary(r => r.Format);
+        var max = Math.Max(1, options?.MaxConcurrent ?? 3);
+        _gate = new SemaphoreSlim(max, max);
+    }
 
     public async Task<ReportOutput> GenerateAsync(ReportRequest request, CancellationToken ct = default)
     {
-        var def = await repository.GetByCodigoAsync(request.Codigo, ct)
+        // Resolucao e validacao sao leves -> fora do limitador.
+        var def = await _repository.GetByCodigoAsync(request.Codigo, ct)
                   ?? throw new ReportNotFoundException(request.Codigo);
 
         var bind = BuildParameters(def, request.Parametros);
 
-        var data = await dataSource.ExecuteAsync(def.Sql, bind, ct);
-
         if (!_renderers.TryGetValue(request.Format, out var renderer))
             throw new ReportParameterException($"Formato '{request.Format}' nao suportado.");
 
-        return renderer.Render(def, data);
+        // Parte pesada (consulta + render): limita a concorrencia. O excedente
+        // aguarda a vez aqui, protegendo CPU e memoria do servidor.
+        await _gate.WaitAsync(ct);
+        try
+        {
+            var data = await _dataSource.ExecuteAsync(def.Sql, bind, ct);
+            return renderer.Render(def, data);
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     /// <summary>

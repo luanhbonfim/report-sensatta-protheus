@@ -45,6 +45,11 @@ if (dataSource.Equals("Oracle", StringComparison.OrdinalIgnoreCase))
 else
     builder.Services.AddSingleton<IReportDataSource, DemoDataSource>();
 
+// Limite de relatorios pesados simultaneos (protege CPU/memoria).
+builder.Services.AddSingleton(new ReportServiceOptions
+{
+    MaxConcurrent = builder.Configuration.GetValue("Reports:MaxConcurrent", 3)
+});
 builder.Services.AddSingleton<ReportService>();
 
 var app = builder.Build();
