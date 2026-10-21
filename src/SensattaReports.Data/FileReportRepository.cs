@@ -23,13 +23,17 @@ public sealed class FileReportRepository(string baseDir) : IReportRepository
         var paramsPath = Path.Combine(dir, "report.params.json");
         var paramsJson = File.Exists(paramsPath) ? await File.ReadAllTextAsync(paramsPath, ct) : null;
 
+        var layoutPath = Path.Combine(dir, "report.layout.json");
+        var layoutJson = File.Exists(layoutPath) ? await File.ReadAllTextAsync(layoutPath, ct) : null;
+
         return new ReportDefinition
         {
             Codigo = codigo,
             Nome = codigo,
             Sql = await File.ReadAllTextAsync(sqlPath, ct),
             TemplateRtm = await File.ReadAllTextAsync(rtmPath, ct),
-            Parametros = ReportParametersJson.Parse(paramsJson)
+            Parametros = ReportParametersJson.Parse(paramsJson),
+            LayoutOverrides = LayoutOverridesJson.Parse(layoutJson)
         };
     }
 }

@@ -21,6 +21,13 @@ public sealed class ReportDefinition
     /// <summary>Parametros que o report aceita.</summary>
     public IReadOnlyList<ReportParameter> Parametros { get; init; } = [];
 
+    /// <summary>
+    /// Ajustes de layout por nome de campo (UserName), vindos do editor visual.
+    /// Vazio = usa o layout do .rtm como esta.
+    /// </summary>
+    public IReadOnlyDictionary<string, ElementOverride> LayoutOverrides { get; init; }
+        = new Dictionary<string, ElementOverride>();
+
     /// <summary>Nome-base do arquivo gerado (sem extensao).</summary>
     public string NomeArquivo => Codigo;
 }

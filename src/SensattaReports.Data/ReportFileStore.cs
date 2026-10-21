@@ -62,4 +62,24 @@ public sealed class ReportFileStore(string baseDir)
             Path.Combine(dir, "report.meta.json"),
             JsonSerializer.Serialize(new { name = nome }, JsonOpts), ct);
     }
+
+    /// <summary>Le os ajustes de layout (report.layout.json) de um report.</summary>
+    public IReadOnlyDictionary<string, ElementOverride> GetLayout(string codigo)
+    {
+        var path = Path.Combine(baseDir, codigo, "report.layout.json");
+        if (!File.Exists(path)) return new Dictionary<string, ElementOverride>();
+        try { return LayoutOverridesJson.Parse(File.ReadAllText(path)); }
+        catch { return new Dictionary<string, ElementOverride>(); }
+    }
+
+    /// <summary>Grava os ajustes de layout (report.layout.json) de um report.</summary>
+    public async Task SaveLayoutAsync(string codigo,
+        IReadOnlyDictionary<string, ElementOverride> overrides, CancellationToken ct = default)
+    {
+        var dir = Path.Combine(baseDir, codigo);
+        Directory.CreateDirectory(dir);
+        await File.WriteAllTextAsync(
+            Path.Combine(dir, "report.layout.json"),
+            LayoutOverridesJson.Serialize(overrides), ct);
+    }
 }

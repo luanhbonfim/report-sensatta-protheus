@@ -90,6 +90,7 @@ public static class RbTemplateLoader
             case "TppLabel":
                 return new RbLabel
                 {
+                    Name = n.GetString("UserName"),
                     LeftMm = L(), TopMm = T(), WidthMm = W(), HeightMm = H(),
                     Text = n.GetString("Caption"),
                     Font = LoadFont(n),
@@ -99,6 +100,7 @@ public static class RbTemplateLoader
             case "TppDBText":
                 return new RbDbText
                 {
+                    Name = n.GetString("UserName"),
                     LeftMm = L(), TopMm = T(), WidthMm = W(), HeightMm = H(),
                     DataField = n.GetString("DataField"),
                     Font = LoadFont(n),
@@ -108,6 +110,7 @@ public static class RbTemplateLoader
             case "TppDBMemo":
                 return new RbDbMemo
                 {
+                    Name = n.GetString("UserName"),
                     LeftMm = L(), TopMm = T(), WidthMm = W(), HeightMm = H(),
                     DataField = n.GetString("DataField"),
                     Font = LoadFont(n),
@@ -119,6 +122,7 @@ public static class RbTemplateLoader
             case "TppSystemVariable":
                 return new RbSystemVariable
                 {
+                    Name = n.GetString("UserName"),
                     LeftMm = L(), TopMm = T(), WidthMm = W(), HeightMm = H(),
                     VarType = SysVar(n.GetString("VarType")),
                     Font = LoadFont(n),
@@ -128,6 +132,7 @@ public static class RbTemplateLoader
             case "TppLine":
                 return new RbLine
                 {
+                    Name = n.GetString("UserName"),
                     LeftMm = L(), TopMm = T(), WidthMm = W(), HeightMm = H(),
                     WeightPt = n.GetDouble("Weight", 1.0),
                     Position = n.GetString("Position")
@@ -136,6 +141,7 @@ public static class RbTemplateLoader
             case "TppShape":
                 return new RbShape
                 {
+                    Name = n.GetString("UserName"),
                     LeftMm = L(), TopMm = T(), WidthMm = W(), HeightMm = H(),
                     BrushColor = RbColor.Parse(n.GetString("Brush.Color", "clWhite"))
                 };
@@ -144,6 +150,7 @@ public static class RbTemplateLoader
                 var blob = n.Get("Picture.Data")?.AsBinary() ?? [];
                 return new RbImage
                 {
+                    Name = n.GetString("UserName"),
                     LeftMm = L(), TopMm = T(), WidthMm = W(), HeightMm = H(),
                     Jpeg = DelphiPicture.ExtractJpeg(blob)
                 };

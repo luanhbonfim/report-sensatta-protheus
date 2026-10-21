@@ -34,8 +34,28 @@ public sealed class PdfReportRenderer : IReportRenderer
     /// <summary>Numero da pagina atual / total — para as variaveis de sistema do rodape.</summary>
     private readonly record struct PageInfo(int Number, int Total);
 
+    /// <summary>Posicao/tamanho efetivos de um elemento (mm) apos aplicar os ajustes do painel.</summary>
+    private readonly record struct Box(double Left, double Top, double Width, double Height, bool Hidden);
+
+    // ajustes de layout vigentes (por nome de campo), setados em Render
+    private IReadOnlyDictionary<string, ElementOverride> _ovr = new Dictionary<string, ElementOverride>();
+
+    /// <summary>Aplica o override (se houver) sobre a posicao/tamanho do elemento.</summary>
+    private Box Eff(RbElement el)
+    {
+        if (el.Name.Length > 0 && _ovr.TryGetValue(el.Name, out var o))
+            return new Box(
+                o.LeftMm ?? el.LeftMm,
+                o.TopMm ?? el.TopMm,
+                o.WidthMm ?? el.WidthMm,
+                o.HeightMm ?? el.HeightMm,
+                o.Hidden);
+        return new Box(el.LeftMm, el.TopMm, el.WidthMm, el.HeightMm, false);
+    }
+
     public ReportOutput Render(ReportDefinition definition, ReportDataSet data)
     {
+        _ovr = definition.LayoutOverrides ?? new Dictionary<string, ElementOverride>();
         var tpl = RbTemplateLoader.Load(definition.TemplateRtm);
 
         using var doc = new PdfDocument();
@@ -206,32 +226,35 @@ public sealed class PdfReportRenderer : IReportRenderer
 
             // detalhe com memo esticado: parte estatica desenhada uma vez,
             // e as linhas do memo fluindo entre paginas
+            var mBox = Eff(memo);
             var memoText = data.GetString(row, memo.DataField);
             var font = BuildFont(memo.Font);
-            var widthPt = XUnit.FromMillimeter(memo.WidthMm).Point;
-            var lines = WrapLines(gfx, memoText, font, widthPt, memo.CharWrap);
+            var widthPt = XUnit.FromMillimeter(mBox.Width).Point;
+            var lines = mBox.Hidden ? new List<string>() : WrapLines(gfx, memoText, font, widthPt, memo.CharWrap);
             var lineHmm = XUnit.FromPoint(font.GetHeight()).Millimeter;
 
             // altura da parte nao-memo (labels, descricao) acima/ao lado do memo
             var staticBottom = d.Elements.Where(e => e is not RbDbMemo)
-                                         .Select(e => e.TopMm + e.HeightMm)
+                                         .Select(e => { var b = Eff(e); return b.Hidden ? 0 : b.Top + b.Height; })
                                          .DefaultIfEmpty(0).Max();
 
             // garante espaco p/ a parte estatica + inicio do memo (ao menos 1 linha)
-            EnsureSpace(Math.Max(staticBottom, memo.TopMm + lineHmm), reprintGroups: true);
+            EnsureSpace(Math.Max(staticBottom, mBox.Top + lineHmm), reprintGroups: true);
 
             // elementos fixos do detalhe (uma vez, no inicio da ocorrencia)
             foreach (var el in d.Elements)
                 if (el is not RbDbMemo)
                 {
-                    var xMm = tpl.MarginLeftMm + el.LeftMm;
-                    var yMm = tpl.MarginTopMm + cursorY + el.TopMm;
-                    DrawElement(gfx, el, xMm, yMm, row, data, default);
+                    var e = Eff(el);
+                    if (e.Hidden) continue;
+                    var xMm = tpl.MarginLeftMm + e.Left;
+                    var yMm = tpl.MarginTopMm + cursorY + e.Top;
+                    DrawElement(gfx, el, xMm, yMm, e.Width, e.Height, row, data, default);
                 }
 
             var startY = cursorY;
-            var memoY = cursorY + memo.TopMm;
-            var memoXmm = tpl.MarginLeftMm + memo.LeftMm;
+            var memoY = cursorY + mBox.Top;
+            var memoXmm = tpl.MarginLeftMm + mBox.Left;
             foreach (var ln in lines)
             {
                 if (memoY + lineHmm > contentHeightMm)
@@ -270,19 +293,21 @@ public sealed class PdfReportRenderer : IReportRenderer
         var h = 0.0;
         foreach (var el in band.Elements)
         {
+            var box = Eff(el);
+            if (box.Hidden) continue;
             double bottom;
             if (el is RbDbMemo memo && row is not null)
             {
                 var text = data.GetString(row, memo.DataField);
                 var font = BuildFont(memo.Font);
-                var widthPt = XUnit.FromMillimeter(memo.WidthMm).Point;
+                var widthPt = XUnit.FromMillimeter(box.Width).Point;
                 var lines = WrapLines(gfx, text, font, widthPt, memo.CharWrap);
                 var lineHmm = XUnit.FromPoint(font.GetHeight()).Millimeter;
-                bottom = el.TopMm + Math.Max(lines.Count, 1) * lineHmm;
+                bottom = box.Top + Math.Max(lines.Count, 1) * lineHmm;
             }
             else
             {
-                bottom = el.TopMm + el.HeightMm;
+                bottom = box.Top + box.Height;
             }
             h = Math.Max(h, bottom);
         }
@@ -294,19 +319,21 @@ public sealed class PdfReportRenderer : IReportRenderer
     {
         foreach (var el in band.Elements)
         {
-            var xMm = tpl.MarginLeftMm + el.LeftMm;
-            var yMm = tpl.MarginTopMm + bandTopMm + el.TopMm;
-            DrawElement(gfx, el, xMm, yMm, row, data, page);
+            var e = Eff(el);
+            if (e.Hidden) continue;
+            var xMm = tpl.MarginLeftMm + e.Left;
+            var yMm = tpl.MarginTopMm + bandTopMm + e.Top;
+            DrawElement(gfx, el, xMm, yMm, e.Width, e.Height, row, data, page);
         }
     }
 
     private void DrawElement(XGraphics gfx, RbElement el,
-        double xMm, double yMm, object?[]? row, ReportDataSet data, PageInfo page)
+        double xMm, double yMm, double wMm, double hMm, object?[]? row, ReportDataSet data, PageInfo page)
     {
         var x = XUnit.FromMillimeter(xMm).Point;
         var y = XUnit.FromMillimeter(yMm).Point;
-        var w = XUnit.FromMillimeter(el.WidthMm).Point;
-        var h = XUnit.FromMillimeter(el.HeightMm).Point;
+        var w = XUnit.FromMillimeter(wMm).Point;
+        var h = XUnit.FromMillimeter(hMm).Point;
         var rect = new XRect(x, y, w, h);
 
         switch (el)

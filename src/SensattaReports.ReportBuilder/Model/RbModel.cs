@@ -65,6 +65,8 @@ public sealed class RbFont
 /// <summary>Base de qualquer elemento posicionado (em milimetros).</summary>
 public abstract class RbElement
 {
+    /// <summary>Nome do componente no .rtm (UserName), usado para ajustes de layout.</summary>
+    public string Name { get; init; } = string.Empty;
     public double LeftMm { get; init; }
     public double TopMm { get; init; }
     public double WidthMm { get; init; }
