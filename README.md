@@ -222,20 +222,78 @@ O endpoint `/reports/...` (que o Protheus chama) **não** exige login — a prot
 
 ---
 
-## Deploy como serviço
+## Deploy como serviço (Windows Server)
 
-- **Windows Server (Windows Service):**
-  ```bash
-  dotnet publish src/SensattaReports.Api -c Release -r win-x64 --self-contained false
-  # no servidor:
-  sc.exe create SensattaReports binPath= "C:\caminho\SensattaReports.Api.exe"
-  sc.exe start SensattaReports
-  ```
-- **Linux (systemd):** publique com `-r linux-x64` e crie um unit file apontando
-  para o executável. O serviço já chama `UseSystemd()`.
+### 1. Publicar (pode ser do próprio Ubuntu)
 
-Por padrão escuta em `http://0.0.0.0:5080` (ajuste em `Urls`). Para TLS, use um
-proxy reverso (IIS/nginx) na frente.
+Gera os binários Windows numa pasta `publish/`. `--self-contained true` embute o
+.NET (não precisa instalar runtime no servidor):
+
+```bash
+dotnet publish src/SensattaReports.Api -c Release -r win-x64 --self-contained true -o publish
+```
+
+> Alternativa menor: `--self-contained false` — aí o servidor precisa ter o
+> **ASP.NET Core Runtime 10** instalado.
+
+### 2. Copiar para o servidor
+
+Copie a pasta `publish/` para, por exemplo, `C:\Services\SensattaReports`.
+
+### 3. Configurar (no servidor, ao lado do .exe)
+
+Crie `C:\Services\SensattaReports\appsettings.Local.json` (não vai para o Git):
+
+```json
+{
+  "Data": { "Source": "Oracle" },
+  "Oracle": { "ConnectionString": "User Id=...;Password=...;Data Source=HOST:1521/SERVICO;" },
+  "Admin": { "User": "admin", "Password": "uma-senha-forte" },
+  "Reports": { "Directory": "C:\\ProgramData\\SensattaReports\\reports" }
+}
+```
+
+Crie a pasta persistente dos reports e copie a semente uma vez:
+
+```bat
+mkdir C:\ProgramData\SensattaReports\reports
+xcopy /E /I C:\Services\SensattaReports\reports C:\ProgramData\SensattaReports\reports
+```
+
+(Assim os reports importados pelo painel sobrevivem a um deploy novo.)
+
+### 4. Instalar como Serviço do Windows
+
+Num PowerShell/CMD **como administrador** (atenção ao espaço depois de `binPath=`):
+
+```bat
+sc.exe create SensattaReports binPath= "C:\Services\SensattaReports\SensattaReports.Api.exe" start= auto
+sc.exe description SensattaReports "Servico de relatorios Sensatta -> Protheus"
+sc.exe start SensattaReports
+```
+
+Testar: `http://<servidor>:5080/health` deve responder `ok`.
+
+### 5. Firewall e rede
+
+- Libere a porta **5080** para o servidor do Protheus alcançar o serviço.
+- **Restrinja `/admin`** à rede interna (firewall/reverse proxy). Para TLS, use
+  IIS/nginx como proxy reverso na frente.
+
+### Atualizar (novo deploy)
+
+```bat
+sc.exe stop SensattaReports
+rem copie os novos arquivos da pasta publish por cima (menos o appsettings.Local.json)
+sc.exe start SensattaReports
+```
+
+### Linux (systemd), se um dia precisar
+
+Publique com `-r linux-x64` e crie um unit file apontando para o executável —
+o serviço já chama `UseSystemd()`.
+
+Por padrão escuta em `http://0.0.0.0:5080` (ajuste em `Urls`).
 
 ---
 
