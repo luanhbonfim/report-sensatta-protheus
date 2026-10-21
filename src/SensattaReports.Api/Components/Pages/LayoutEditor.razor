@@ -1,0 +1,327 @@
+@page "/admin/layout/{codigo}"
+@implements IAsyncDisposable
+@inject IReportRepository Repo
+@inject ReportFileStore Store
+@inject ToastService Toasts
+@inject IJSRuntime JS
+@using Microsoft.JSInterop
+@using SensattaReports.ReportBuilder.Model
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h4 class="fw-bold mb-0">Editar layout</h4>
+        <div class="text-muted small">@(nome ?? codigo) · arraste os campos para reposicionar</div>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="/admin/relatorios"><i class="bi bi-arrow-left me-1"></i>Voltar</a>
+        <button class="btn btn-outline-danger" @onclick="ResetarTudo" disabled="@(overrides.Count == 0)"><i class="bi bi-arrow-counterclockwise me-1"></i>Desfazer tudo</button>
+        <button class="btn btn-primary" @onclick="Salvar"><i class="bi bi-save me-1"></i>Salvar layout</button>
+    </div>
+</div>
+
+@if (tpl is null)
+{
+    <div class="alert alert-light border">@(erro ?? "Carregando…")</div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="layout-canvas" @ref="canvas">
+                @foreach (var sec in Secoes())
+                {
+                    <div class="band-label">@sec.Label <span class="text-muted">· @F(sec.Band.HeightMm) mm</span></div>
+                    <div class="band" style="width:@Px(tpl.ContentWidthMm)px; height:@Px(Math.Max(sec.Band.HeightMm, 6))px;">
+                        @foreach (var el in sec.Band.Elements)
+                        {
+                            var b = Eff(el);
+                            var isSel = el.Name == selecionado;
+                            <div class="rp-field @(el is RbLine ? "is-line" : "") @(b.Hidden ? "is-hidden" : "") @(isSel ? "sel" : "")"
+                                 data-name="@el.Name"
+                                 style="left:@Px(b.Left)px; top:@Px(b.Top)px; width:@Px(Math.Max(b.Width,2))px; height:@Px(Math.Max(b.Height,2))px;"
+                                 title="@el.Name"
+                                 @onclick="() => Selecionar(el.Name)">
+                                <span class="rp-field-txt">@Rotulo(el)</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+            <div class="text-muted small mt-2">
+                <i class="bi bi-info-circle me-1"></i>Clique num campo para selecioná-lo e ajustar os valores à direita. Arraste para mover.
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card mb-3">
+                <div class="card-header">Campo selecionado</div>
+                <div class="card-body">
+                    @if (sel is not { } s)
+                    {
+                        <div class="text-muted small">Nenhum campo selecionado.</div>
+                    }
+                    else
+                    {
+                        var b = Eff(s);
+                        <div class="fw-semibold mb-1">@Rotulo(s)</div>
+                        <div class="text-muted small font-monospace mb-3">@s.Name</div>
+
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small mb-0">Esquerda (mm)</label>
+                                <input type="number" step="0.5" class="form-control form-control-sm"
+                                       value="@F(b.Left)" @onchange="e => SetPos(e, 'L')" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small mb-0">Topo (mm)</label>
+                                <input type="number" step="0.5" class="form-control form-control-sm"
+                                       value="@F(b.Top)" @onchange="e => SetPos(e, 'T')" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small mb-0">Largura (mm)</label>
+                                <input type="number" step="0.5" class="form-control form-control-sm"
+                                       value="@F(b.Width)" @onchange="e => SetPos(e, 'W')" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small mb-0">Altura (mm)</label>
+                                <input type="number" step="0.5" class="form-control form-control-sm"
+                                       value="@F(b.Height)" @onchange="e => SetPos(e, 'H')" />
+                            </div>
+                        </div>
+
+                        <div class="form-check mt-3">
+                            <input class="form-check-input" type="checkbox" id="chkHide"
+                                   checked="@b.Hidden" @onchange="ToggleHidden" />
+                            <label class="form-check-label small" for="chkHide">Ocultar este campo</label>
+                        </div>
+
+                        @if (overrides.ContainsKey(s.Name))
+                        {
+                            <button class="btn btn-sm btn-outline-secondary mt-3" @onclick="() => ResetarCampo(s.Name)">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i>Voltar ao original
+                            </button>
+                        }
+                    }
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Pré-visualizar</span>
+                    <button class="btn btn-sm btn-primary" @onclick="AtualizarPreview"><i class="bi bi-arrow-repeat me-1"></i>Gerar</button>
+                </div>
+                <div class="card-body">
+                    @if (parametros.Count > 0)
+                    {
+                        <div class="small text-muted mb-1">Valores de teste</div>
+                        @foreach (var p in parametros)
+                        {
+                            <input class="form-control form-control-sm mb-2" placeholder="@p"
+                                   @bind:get="GetTeste(p)" @bind:set="v => SetTeste(p, v)" />
+                        }
+                    }
+                    @if (previewUrl is not null)
+                    {
+                        <iframe src="@previewUrl" class="preview-frame"></iframe>
+                        <a class="small" href="@previewUrl" target="_blank">Abrir em nova aba ↗</a>
+                    }
+                    else
+                    {
+                        <div class="text-muted small">Preencha os valores e clique em <b>Gerar</b>. Dica: salve o layout antes para ver os ajustes.</div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .layout-canvas { overflow:auto; background:#fff; border:1px solid #dee2e6; border-radius:.5rem; padding:12px; }
+    .band-label { font-size:.72rem; font-weight:600; color:#6b0d0d; margin:10px 0 2px; }
+    .band { position:relative; background:#fbfbfb; border:1px dashed #cdd3da; }
+    .rp-field { position:absolute; box-sizing:border-box; border:1px solid #9bb3d4; background:rgba(13,110,253,.06);
+                font-size:9px; line-height:1; overflow:hidden; cursor:grab; user-select:none; padding:1px 2px; white-space:nowrap; }
+    .rp-field:hover { border-color:#0d6efd; background:rgba(13,110,253,.14); }
+    .rp-field.sel { border-color:#d20a11; background:rgba(210,10,17,.12); box-shadow:0 0 0 2px rgba(210,10,17,.25); z-index:5; }
+    .rp-field.is-line { background:#adb5bd; border:none; }
+    .rp-field.is-hidden { opacity:.35; border-style:dotted; }
+    .rp-field.rp-dragging { cursor:grabbing; opacity:.8; z-index:10; }
+    .rp-field-txt { pointer-events:none; }
+    .preview-frame { width:100%; height:480px; border:1px solid #dee2e6; border-radius:.375rem; margin-top:.25rem; }
+</style>
+
+@code {
+    [Parameter] public string codigo { get; set; } = "";
+
+    const double Scale = 3.0; // px por mm
+
+    RbTemplate? tpl;
+    string? nome;
+    string? erro;
+    string? selecionado;
+    string? previewUrl;
+
+    readonly Dictionary<string, ElementOverride> overrides = new(StringComparer.OrdinalIgnoreCase);
+    List<string> parametros = new();
+    readonly Dictionary<string, string> testeValores = new();
+
+    ElementReference canvas;
+    IJSObjectReference? module;
+    DotNetObjectReference<LayoutEditor>? selfRef;
+
+    RbElement? sel => tpl is null || selecionado is null ? null : Todos().FirstOrDefault(e => e.Name == selecionado);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var def = await Repo.GetByCodigoAsync(codigo);
+        if (def is null) { erro = "Relatório não encontrado."; return; }
+
+        nome = Store.GetName(codigo) ?? codigo;
+        tpl = RbTemplateLoader.Load(def.TemplateRtm);
+        foreach (var kv in Store.GetLayout(codigo)) overrides[kv.Key] = kv.Value;
+        parametros = def.Parametros.Select(p => p.Name).ToList();
+        foreach (var p in parametros) testeValores[p] = "";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (first && tpl is not null)
+        {
+            module = await JS.InvokeAsync<IJSObjectReference>("import", "./layout-editor.js");
+            selfRef = DotNetObjectReference.Create(this);
+            await module.InvokeVoidAsync("enableDrag", canvas, selfRef, Scale);
+        }
+    }
+
+    [JSInvokable]
+    public Task OnFieldMoved(string name, double leftMm, double topMm)
+    {
+        Merge(name, o => o with { LeftMm = Round(leftMm), TopMm = Round(topMm) });
+        selecionado = name;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    // ---- bandas / elementos ----
+    record Secao(string Label, RbBand Band);
+
+    IEnumerable<Secao> Secoes()
+    {
+        if (tpl is null) yield break;
+        if (tpl.TitleBand is { } t) yield return new("Título", t);
+        if (tpl.HeaderBand is { } h) yield return new("Cabeçalho da página", h);
+        foreach (var g in tpl.Groups)
+            if (g.Header is { } gh) yield return new($"Grupo \"{g.BreakField}\" — cabeçalho", gh);
+        if (tpl.DetailBand is { } d) yield return new("Detalhe", d);
+        foreach (var g in tpl.Groups)
+            if (g.Footer is { Elements.Count: > 0 } gf) yield return new($"Grupo \"{g.BreakField}\" — rodapé", gf);
+        if (tpl.FooterBand is { } f) yield return new("Rodapé da página", f);
+        if (tpl.SummaryBand is { } s) yield return new("Resumo", s);
+    }
+
+    IEnumerable<RbElement> Todos() => Secoes().SelectMany(s => s.Band.Elements);
+
+    string Rotulo(RbElement el) => el switch
+    {
+        RbLabel l => Trunc(l.Text),
+        RbDbText d => "⬚ " + d.DataField,
+        RbDbMemo m => "▤ " + m.DataField,
+        RbSystemVariable v => "⚙ " + v.VarType,
+        RbImage => "🖼",
+        RbShape => "▭",
+        RbLine => "",
+        _ => el.Name
+    };
+
+    static string Trunc(string s) => s.Length > 40 ? s[..40] + "…" : s;
+
+    // posicao/tamanho efetivos (base + override)
+    (double Left, double Top, double Width, double Height, bool Hidden) Eff(RbElement el)
+    {
+        if (overrides.TryGetValue(el.Name, out var o))
+            return (o.LeftMm ?? el.LeftMm, o.TopMm ?? el.TopMm,
+                    o.WidthMm ?? el.WidthMm, o.HeightMm ?? el.HeightMm, o.Hidden);
+        return (el.LeftMm, el.TopMm, el.WidthMm, el.HeightMm, false);
+    }
+
+    void Merge(string name, Func<ElementOverride, ElementOverride> upd)
+    {
+        var cur = overrides.TryGetValue(name, out var o) ? o : new ElementOverride();
+        overrides[name] = upd(cur);
+    }
+
+    void Selecionar(string name) => selecionado = name;
+
+    void SetPos(ChangeEventArgs e, char campo)
+    {
+        var s = sel;
+        if (s is null) return;
+        var txt = e.Value?.ToString();
+        if (!double.TryParse(txt, System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture, out var v)
+            && !double.TryParse(txt, out v)) return;
+        v = Round(v);
+        Merge(s.Name, o => campo switch
+        {
+            'L' => o with { LeftMm = v },
+            'T' => o with { TopMm = v },
+            'W' => o with { WidthMm = v },
+            'H' => o with { HeightMm = v },
+            _ => o
+        });
+    }
+
+    void ToggleHidden(ChangeEventArgs e)
+    {
+        var s = sel;
+        if (s is null) return;
+        var on = e.Value is bool bv && bv;
+        Merge(s.Name, o => o with { Hidden = on });
+    }
+
+    void ResetarCampo(string name)
+    {
+        overrides.Remove(name);
+    }
+
+    void ResetarTudo()
+    {
+        overrides.Clear();
+        Toasts.Info("Ajustes descartados (ainda não salvos).");
+    }
+
+    async Task Salvar()
+    {
+        try
+        {
+            await Store.SaveLayoutAsync(codigo, overrides);
+            Toasts.Success("Layout salvo! Gere o preview para conferir.");
+        }
+        catch (Exception ex)
+        {
+            Toasts.Error("Erro ao salvar: " + ex.Message);
+        }
+    }
+
+    string GetTeste(string name) => testeValores.TryGetValue(name, out var v) ? v : "";
+    void SetTeste(string name, string? v) => testeValores[name] = v ?? "";
+
+    void AtualizarPreview()
+    {
+        var qs = string.Join("&", parametros
+            .Where(n => !string.IsNullOrWhiteSpace(GetTeste(n)))
+            .Select(n => Uri.EscapeDataString(n) + "=" + Uri.EscapeDataString(GetTeste(n))));
+        var baseUrl = $"/reports/{Uri.EscapeDataString(codigo)}/pdf";
+        var sep = qs.Length > 0 ? "?" + qs + "&" : "?";
+        previewUrl = baseUrl + sep + "v=" + DateTime.Now.Ticks; // cache-buster
+    }
+
+    static double Round(double v) => Math.Round(v, 2);
+    static string F(double mm) => mm.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+    static string Px(double mm) => (mm * Scale).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+
+    public async ValueTask DisposeAsync()
+    {
+        try { if (module is not null) await module.DisposeAsync(); } catch { }
+        selfRef?.Dispose();
+    }
+}

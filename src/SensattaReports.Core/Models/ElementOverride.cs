@@ -6,7 +6,7 @@ namespace SensattaReports.Core.Models;
 /// na renderizacao, sem alterar o .rtm original. Cada medida e opcional (em mm):
 /// null = mantem o valor do template.
 /// </summary>
-public sealed class ElementOverride
+public sealed record ElementOverride
 {
     public double? LeftMm { get; init; }
     public double? TopMm { get; init; }

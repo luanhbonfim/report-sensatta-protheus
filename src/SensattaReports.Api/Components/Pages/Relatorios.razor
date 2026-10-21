@@ -34,8 +34,9 @@
                             <td>@r.Params</td>
                             <td><code class="endpoint">/reports/@r.Codigo/pdf</code></td>
                             <td class="text-end pe-3">
-                                <a class="btn btn-sm btn-outline-secondary" href="/reports/@r.Codigo/pdf" target="_blank"><i class="bi bi-eye"></i></a>
-                                <button class="btn btn-sm btn-outline-primary" @onclick="() => editor.OpenAsync(r.Nome, r.Codigo, true)"><i class="bi bi-pencil"></i> Editar</button>
+                                <a class="btn btn-sm btn-outline-secondary" href="/reports/@r.Codigo/pdf" target="_blank" title="Ver PDF"><i class="bi bi-eye"></i></a>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => editor.OpenAsync(r.Nome, r.Codigo, true)"><i class="bi bi-pencil"></i> SQL</button>
+                                <a class="btn btn-sm btn-outline-primary" href="/admin/layout/@r.Codigo" title="Editar layout"><i class="bi bi-rulers"></i> Layout</a>
                             </td>
                         </tr>
                     }
