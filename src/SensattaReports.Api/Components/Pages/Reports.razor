@@ -4,6 +4,10 @@
 @inject IReportRepository Repo
 
 <h1>Relatórios</h1>
+<p class="hint" style="margin:-4px 0 14px">
+    1) Escolha um report no catálogo · 2) Cole o SQL e detecte os parâmetros ·
+    3) Salve · 4) Teste gerando o PDF.
+</p>
 
 <div class="grid">
 
@@ -70,12 +74,21 @@
         </table>
 
         <div class="row mt">
-            <button class="btn primary" @onclick="Salvar">💾 Salvar / Importar</button>
+            <button class="btn primary" @onclick="Salvar" disabled="@(!PodeSalvar())">💾 Salvar / Importar</button>
         </div>
 
         @if (msg is not null)
         {
             <div class="@MsgClass()">@msg</div>
+        }
+
+        @if (urlSalva is not null)
+        {
+            <label>Endpoint (para o Protheus)</label>
+            <div class="row">
+                <input class="in" readonly value="@urlSalva" />
+                <a class="btn" href="@urlSalva" target="_blank">Abrir</a>
+            </div>
         }
 
         @if (testarCodigo is not null)
@@ -121,6 +134,7 @@
     string? msg;
     bool msgOk;
     string? testarCodigo;
+    string? urlSalva;
     readonly Dictionary<string, string> testeValores = new();
 
     protected override async Task OnInitializedAsync() => await CarregarCatalogo();
@@ -141,7 +155,7 @@
     async Task Selecionar(Item it)
     {
         sel = it.Codigo; nome = it.Name; codigo = it.Codigo;
-        sql = ""; parametros = new(); msg = null; testarCodigo = null;
+        sql = ""; parametros = new(); msg = null; testarCodigo = null; urlSalva = null;
         if (it.Imported)
         {
             var def = await Repo.GetByCodigoAsync(it.Codigo);
@@ -188,7 +202,8 @@
         testarCodigo = cod;
         testeValores.Clear();
         foreach (var p in ps) testeValores[p.Name] = "";
-        Msg($"Salvo! Disponível em /reports/{cod}/pdf", true);
+        urlSalva = $"/reports/{cod}/pdf";
+        Msg("Salvo com sucesso!", true);
         await CarregarCatalogo();
     }
 
@@ -203,6 +218,8 @@
         return $"/reports/{Uri.EscapeDataString(testarCodigo!)}/{fmt}" + (qs.Length > 0 ? "?" + qs : "");
     }
 
+    bool PodeSalvar() => !string.IsNullOrWhiteSpace(sql)
+        && !string.IsNullOrWhiteSpace(string.IsNullOrWhiteSpace(codigo) ? nome : codigo);
     string ItemClass(string cod) => sel == cod ? "item sel" : "item";
     string MsgClass() => msgOk ? "msg ok" : "msg err";
     static string Placeholder(string type) => type == "Date" ? "2026-10-20" : "";

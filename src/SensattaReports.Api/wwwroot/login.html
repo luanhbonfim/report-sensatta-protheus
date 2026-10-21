@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entrar — Sensatta Reports</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div class="login-wrap">
+    <form class="login-card" method="post" action="/auth/login">
+      <div class="login-brand">Sensatta Reports</div>
+      <div class="login-sub">Painel de relatórios</div>
+
+      <div id="erro" class="msg err" style="display:none; margin-bottom:12px">
+        Usuário ou senha inválidos.
+      </div>
+
+      <label>Usuário</label>
+      <input class="in" name="user" autofocus autocomplete="username" required>
+
+      <label>Senha</label>
+      <input class="in" name="password" type="password" autocomplete="current-password" required>
+
+      <input type="hidden" name="returnUrl" id="returnUrl">
+      <button class="btn primary" style="margin-top:16px; width:100%" type="submit">Entrar</button>
+    </form>
+  </div>
+
+  <script>
+    const q = new URLSearchParams(location.search);
+    if (q.get('erro')) document.getElementById('erro').style.display = 'block';
+    document.getElementById('returnUrl').value = q.get('ReturnUrl') || '/admin';
+  </script>
+</body>
+</html>

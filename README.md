@@ -205,9 +205,20 @@ Fluxo:
 > publish (ex.: `C:\ProgramData\SensattaReports\reports`), senão um deploy novo
 > sobrescreve os reports importados.
 >
-> **Segurança:** o painel escreve arquivos e lê o Oracle — **restrinja o acesso
-> a `/admin` na rede** (firewall/reverse proxy). Dá para desligá-lo com
-> `Admin:Enabled=false` no `appsettings`.
+### Login do painel
+
+O `/admin` exige **login** (cookie). As credenciais ficam na configuração:
+
+- `Admin:User` (padrão `admin`, em `appsettings.json`)
+- `Admin:Password` — **defina no `appsettings.Local.json` ou na variável
+  `Admin__Password`**. Sem ela, a senha padrão é `admin` (troque!).
+
+O endpoint `/reports/...` (que o Protheus chama) **não** exige login — a proteção
+é só do painel.
+
+> **Segurança:** além do login, o painel escreve arquivos e lê o Oracle —
+> **restrinja o acesso a `/admin` na rede** (firewall/reverse proxy). Dá para
+> desligá-lo por completo com `Admin:Enabled=false` no `appsettings`.
 
 ---
 

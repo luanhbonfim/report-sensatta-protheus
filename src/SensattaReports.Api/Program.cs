@@ -1,3 +1,6 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using SensattaReports.Api.Components;
 using SensattaReports.Core;
 using SensattaReports.Core.Abstractions;
@@ -68,10 +71,23 @@ builder.Services.AddSingleton<ReportService>();
 // Blazor Server — o painel /admin.
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
+// Autenticacao por cookie para o painel. Credenciais em Admin:User/Admin:Password.
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(o =>
+    {
+        o.LoginPath = "/login.html";
+        o.AccessDeniedPath = "/login.html";
+        o.ExpireTimeSpan = TimeSpan.FromHours(8);
+        o.SlidingExpiration = true;
+    });
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
 // Arquivos estaticos (CSS do painel etc.) + antiforgery exigido pelo Blazor.
 app.UseStaticFiles();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
 // Log de diagnostico: mostra no console qual fonte de dados esta ativa.
@@ -104,7 +120,39 @@ app.MapPost("/reports/{codigo}", async (string codigo, GerarDto body, ReportServ
 // ---------------------------------------------------------------------------
 if (app.Configuration.GetValue("Admin:Enabled", true))
 {
-    app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
+    // Login/logout por cookie. Credenciais em Admin:User / Admin:Password (config).
+    app.MapPost("/auth/login", async (HttpContext http, IConfiguration cfg) =>
+    {
+        var form = await http.Request.ReadFormAsync();
+        var user = form["user"].ToString();
+        var pass = form["password"].ToString();
+        var returnUrl = form["returnUrl"].ToString();
+
+        var okUser = cfg["Admin:User"] ?? "admin";
+        var okPass = cfg["Admin:Password"] ?? "admin";
+
+        if (user == okUser && pass == okPass)
+        {
+            var id = new ClaimsIdentity(
+                [new Claim(ClaimTypes.Name, user)],
+                CookieAuthenticationDefaults.AuthenticationScheme);
+            await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(id));
+
+            // so redireciona para caminho local (evita open redirect)
+            var dest = returnUrl.StartsWith('/') && !returnUrl.StartsWith("//") ? returnUrl : "/admin";
+            return Results.Redirect(dest);
+        }
+        return Results.Redirect("/login.html?erro=1");
+    }).DisableAntiforgery();
+
+    app.MapGet("/auth/logout", async (HttpContext http) =>
+    {
+        await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        return Results.Redirect("/login.html");
+    });
+
+    // o painel exige login
+    app.MapRazorComponents<App>().AddInteractiveServerRenderMode().RequireAuthorization();
 }
 
 app.Run();

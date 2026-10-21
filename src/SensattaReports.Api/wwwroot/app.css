@@ -5,8 +5,20 @@
 * { box-sizing:border-box; }
 body { margin:0; font:14px/1.45 system-ui,Segoe UI,Arial,sans-serif; color:var(--ink); background:var(--bg); }
 
-.topbar { background:var(--brand); color:#fff; padding:14px 20px; font-size:18px; font-weight:700; }
+.topbar { background:var(--brand); color:#fff; padding:12px 20px; display:flex; align-items:center;
+          justify-content:space-between; gap:12px; }
+.topbar-title { font-size:18px; font-weight:700; }
+.topbar-right { display:flex; align-items:center; gap:12px; font-size:13px; }
+.topbar-user { opacity:.9; }
+.topbar-link { color:#fff; text-decoration:underline; }
 .content { padding:16px; }
+
+/* Login */
+.login-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px; }
+.login-card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:28px;
+              width:100%; max-width:340px; box-shadow:0 6px 24px rgba(0,0,0,.08); }
+.login-brand { color:var(--brand); font-size:22px; font-weight:800; }
+.login-sub { color:var(--muted); margin-bottom:18px; }
 h1 { font-size:20px; margin:0 0 12px; }
 h2 { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:0 0 10px; }
 
