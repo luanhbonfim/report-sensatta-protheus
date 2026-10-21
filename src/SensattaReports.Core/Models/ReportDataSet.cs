@@ -23,11 +23,23 @@ public sealed class ReportDataSet
             _index[columns[i]] = i;
     }
 
-    public bool HasColumn(string name) => _index.ContainsKey(name);
+    /// <summary>
+    /// Campos extras constantes (mesmo valor em todas as linhas), consultados
+    /// quando a coluna nao existe no resultado do SQL. Usado para expor os
+    /// parametros da requisicao ao layout (ex.: P_ROMANEIO_INICIAL no cabecalho).
+    /// </summary>
+    public IReadOnlyDictionary<string, object?>? Extras { get; set; }
+
+    public bool HasColumn(string name) => _index.ContainsKey(name)
+        || (Extras?.ContainsKey(name) ?? false);
 
     /// <summary>Valor cru de uma celula por nome de coluna (null se nao existir).</summary>
     public object? GetValue(object?[] row, string column)
-        => _index.TryGetValue(column, out var i) && i < row.Length ? row[i] : null;
+    {
+        if (_index.TryGetValue(column, out var i) && i < row.Length) return row[i];
+        if (Extras is not null && Extras.TryGetValue(column, out var v)) return v;
+        return null;
+    }
 
     /// <summary>
     /// Valor ja formatado como texto para exibir no report.

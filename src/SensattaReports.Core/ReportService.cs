@@ -46,6 +46,8 @@ public sealed class ReportService
         try
         {
             var data = await _dataSource.ExecuteAsync(def.Sql, bind, ct);
+            // expoe os parametros ao layout como campos (ex.: P_ROMANEIO_INICIAL)
+            data.Extras = BuildExtras(def, request.Parametros);
             return renderer.Render(def, data);
         }
         finally
@@ -82,6 +84,28 @@ public sealed class ReportService
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Monta os campos extras a partir dos parametros recebidos, para o layout
+    /// poder exibi-los. Cada parametro vira ate tres campos: o nome como veio,
+    /// em MAIUSCULAS e com prefixo "P_" (convencao do ReportBuilder/Sensatta).
+    /// So inclui parametros declarados e preenchidos.
+    /// </summary>
+    private static Dictionary<string, object?> BuildExtras(
+        ReportDefinition def,
+        IReadOnlyDictionary<string, string?> recebidos)
+    {
+        var extras = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in def.Parametros)
+        {
+            if (!recebidos.TryGetValue(p.Name, out var raw) || string.IsNullOrWhiteSpace(raw))
+                continue;
+            extras[p.Name] = raw;
+            extras[p.Name.ToUpperInvariant()] = raw;
+            extras["P_" + p.Name.ToUpperInvariant()] = raw;
+        }
+        return extras;
     }
 
     private static object Convert(ReportParameter p, string raw)
