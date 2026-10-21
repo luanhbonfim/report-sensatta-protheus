@@ -1,0 +1,63 @@
+@page "/admin/relatorios"
+@inject ReportFileStore Store
+@inject IReportRepository Repo
+
+<div class="page-head">
+    <div>
+        <h1>Relatórios</h1>
+        <p class="muted">Relatórios importados e seus endpoints</p>
+    </div>
+    <a class="btn primary" href="/admin/importar">＋ Importar</a>
+</div>
+
+@if (itens.Count == 0)
+{
+    <div class="empty">
+        Nenhum relatório importado ainda. <a class="link" href="/admin/importar">Importe o primeiro →</a>
+    </div>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr><th>Nome</th><th>Código</th><th>Params</th><th>Endpoint (PDF)</th><th class="right">Ações</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var r in itens)
+            {
+                <tr>
+                    <td>@r.Nome</td>
+                    <td class="mono">@r.Codigo</td>
+                    <td>@r.Params</td>
+                    <td><code class="endpoint">/reports/@r.Codigo/pdf</code></td>
+                    <td class="right">
+                        <a class="btn sm ghost" href="/reports/@r.Codigo/pdf" target="_blank">Testar</a>
+                        <button class="btn sm" @onclick="() => editor.OpenAsync(r.Nome, r.Codigo, true)">Editar</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<ReportEditor @ref="editor" OnSaved="Carregar" />
+
+@code {
+    record Row(string Codigo, string Nome, int Params);
+
+    List<Row> itens = new();
+    ReportEditor editor = default!;
+
+    protected override async Task OnInitializedAsync() => await Carregar();
+
+    async Task Carregar()
+    {
+        var list = new List<Row>();
+        foreach (var cod in Store.ListImported())
+        {
+            var def = await Repo.GetByCodigoAsync(cod);
+            list.Add(new Row(cod, Store.GetName(cod) ?? cod, def?.Parametros.Count ?? 0));
+        }
+        itens = list;
+    }
+}

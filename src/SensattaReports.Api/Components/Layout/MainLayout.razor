@@ -1,13 +1,30 @@
 @inherits LayoutComponentBase
 
-<div class="topbar">
-    <span class="topbar-title">Sensatta Reports</span>
-    <span class="topbar-right">
-        <a class="topbar-link" href="/auth/logout">Sair</a>
-    </span>
+<div class="shell">
+    <aside class="sidebar">
+        <div class="brand">Sensatta<span>Reports</span></div>
+        <nav class="nav-list">
+            <NavLink class="nav" href="/admin" Match="NavLinkMatch.All">
+                <span class="nav-ic">▦</span> Dashboard
+            </NavLink>
+            <NavLink class="nav" href="/admin/relatorios">
+                <span class="nav-ic">▤</span> Relatórios
+            </NavLink>
+            <NavLink class="nav" href="/admin/chamadas">
+                <span class="nav-ic">↯</span> Chamadas
+            </NavLink>
+            <NavLink class="nav" href="/admin/importar">
+                <span class="nav-ic">＋</span> Importar
+            </NavLink>
+        </nav>
+        <a class="nav logout" href="/auth/logout"><span class="nav-ic">⇥</span> Sair</a>
+    </aside>
+
+    <div class="main">
+        <main class="content">
+            @Body
+        </main>
+    </div>
 </div>
-<main class="content">
-    @Body
-</main>
 
 <Toasts />

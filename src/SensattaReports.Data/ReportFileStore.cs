@@ -6,7 +6,7 @@ namespace SensattaReports.Data;
 /// <summary>
 /// Grava/consulta os arquivos de um report na pasta do servidor, no formato
 /// que o FileReportRepository le: reports/&lt;codigo&gt;/report.{sql,rtm,params.json}.
-/// E o que o painel usa ao importar/atualizar um report.
+/// Guarda tambem report.meta.json com o nome amigavel (do catalogo).
 /// </summary>
 public sealed class ReportFileStore(string baseDir)
 {
@@ -25,7 +25,20 @@ public sealed class ReportFileStore(string baseDir)
                 .ToList()
             : [];
 
-    public async Task SaveAsync(string codigo, string sql, string rtm,
+    /// <summary>Nome amigavel salvo no meta (ou null).</summary>
+    public string? GetName(string codigo)
+    {
+        var path = Path.Combine(baseDir, codigo, "report.meta.json");
+        if (!File.Exists(path)) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            return doc.RootElement.TryGetProperty("name", out var n) ? n.GetString() : null;
+        }
+        catch { return null; }
+    }
+
+    public async Task SaveAsync(string codigo, string nome, string sql, string rtm,
         IReadOnlyList<ReportParameter> parametros, CancellationToken ct = default)
     {
         var dir = Path.Combine(baseDir, codigo);
@@ -44,5 +57,9 @@ public sealed class ReportFileStore(string baseDir)
         await File.WriteAllTextAsync(
             Path.Combine(dir, "report.params.json"),
             JsonSerializer.Serialize(dto, JsonOpts), ct);
+
+        await File.WriteAllTextAsync(
+            Path.Combine(dir, "report.meta.json"),
+            JsonSerializer.Serialize(new { name = nome }, JsonOpts), ct);
     }
 }

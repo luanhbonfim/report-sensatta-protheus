@@ -1,0 +1,82 @@
+@page "/admin/importar"
+@inject IReportCatalog Catalog
+@inject ReportFileStore Store
+
+<div class="page-head">
+    <div>
+        <h1>Importar relatório</h1>
+        <p class="muted">Escolha um relatório do catálogo (SIGMA.REPORT) para configurar</p>
+    </div>
+</div>
+
+<div class="toolbar">
+    <input class="in search" placeholder="🔍  Filtrar relatórios..." @bind="filtro" @bind:event="oninput" />
+    <span class="muted small">@Filtrados().Count() de @catalogo.Count</span>
+</div>
+
+@if (carregando)
+{
+    <div class="empty">Carregando catálogo…</div>
+}
+else if (!Filtrados().Any())
+{
+    <div class="empty">
+        @(catalogo.Count == 0
+            ? "Catálogo vazio — configure o Oracle para listar a SIGMA.REPORT."
+            : "Nenhum relatório para esse filtro.")
+    </div>
+}
+else
+{
+    <div class="cards">
+        @foreach (var it in Filtrados())
+        {
+            <div class="report-card" @onclick="() => editor.OpenAsync(it.Name, it.Codigo, it.Imported)">
+                <div class="report-card-top">
+                    <span class="chip @(it.Imported ? "chip-ok" : "chip-muted")">@(it.Imported ? "ativo" : "novo")</span>
+                </div>
+                <div class="report-name">@it.Name</div>
+                <div class="report-cod">@it.Codigo</div>
+                <div class="report-action">@(it.Imported ? "Editar →" : "Configurar →")</div>
+            </div>
+        }
+    </div>
+}
+
+<ReportEditor @ref="editor" OnSaved="CarregarCatalogo" />
+
+@code {
+    record Item(string Name, string Codigo, bool Imported);
+
+    List<Item> catalogo = new();
+    bool carregando = true;
+    string filtro = "";
+    ReportEditor editor = default!;
+
+    protected override async Task OnInitializedAsync() => await CarregarCatalogo();
+
+    async Task CarregarCatalogo()
+    {
+        carregando = true;
+        try
+        {
+            var nomes = await Catalog.ListAsync();
+            var imp = Store.ListImported().ToHashSet(StringComparer.OrdinalIgnoreCase);
+            catalogo = nomes.Select(n => { var c = Slug.From(n); return new Item(n, c, imp.Contains(c)); }).ToList();
+        }
+        catch
+        {
+            catalogo = new();
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+
+    IEnumerable<Item> Filtrados()
+    {
+        var f = (filtro ?? "").ToLowerInvariant();
+        return catalogo.Where(i => i.Name.ToLowerInvariant().Contains(f) || i.Codigo.Contains(f));
+    }
+}

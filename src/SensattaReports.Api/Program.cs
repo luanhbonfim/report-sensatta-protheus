@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using SensattaReports.Api.Components;
+using SensattaReports.Api.Services;
 using SensattaReports.Core;
 using SensattaReports.Core.Abstractions;
 using SensattaReports.Core.Models;
@@ -71,6 +73,7 @@ builder.Services.AddSingleton<ReportService>();
 // Blazor Server — o painel /admin.
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddScoped<SensattaReports.Api.Services.ToastService>();
+builder.Services.AddSingleton<SensattaReports.Api.Services.CallLogService>();
 
 // Autenticacao por cookie para o painel. Credenciais em Admin:User/Admin:Password.
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -100,18 +103,18 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok", time = DateTime.UtcN
 
 // Download direto (GET) — pratico para o Protheus via FWRest/HttpGet.
 // Ex.: /reports/resumo-coletas-eua/pdf?data_ini=2026-10-01&data_fim=2026-10-31
-app.MapGet("/reports/{codigo}/pdf", (string codigo, HttpContext ctx, ReportService svc, CancellationToken ct)
-    => Generate(codigo, ReportFormat.Pdf, QueryParams(ctx), svc, ct));
+app.MapGet("/reports/{codigo}/pdf", (string codigo, HttpContext ctx, ReportService svc, CallLogService log, CancellationToken ct)
+    => Generate(codigo, ReportFormat.Pdf, QueryParams(ctx), svc, log, ct));
 
-app.MapGet("/reports/{codigo}/xlsx", (string codigo, HttpContext ctx, ReportService svc, CancellationToken ct)
-    => Generate(codigo, ReportFormat.Xlsx, QueryParams(ctx), svc, ct));
+app.MapGet("/reports/{codigo}/xlsx", (string codigo, HttpContext ctx, ReportService svc, CallLogService log, CancellationToken ct)
+    => Generate(codigo, ReportFormat.Xlsx, QueryParams(ctx), svc, log, ct));
 
 // Alternativa por POST com corpo JSON: { "format": "pdf", "parametros": { "data_ini": "..." } }
-app.MapPost("/reports/{codigo}", async (string codigo, GerarDto body, ReportService svc, CancellationToken ct) =>
+app.MapPost("/reports/{codigo}", async (string codigo, GerarDto body, ReportService svc, CallLogService log, CancellationToken ct) =>
 {
     var fmt = string.Equals(body.Format, "xlsx", StringComparison.OrdinalIgnoreCase)
         ? ReportFormat.Xlsx : ReportFormat.Pdf;
-    return await Generate(codigo, fmt, body.Parametros ?? new(), svc, ct);
+    return await Generate(codigo, fmt, body.Parametros ?? new(), svc, log, ct);
 });
 
 // ---------------------------------------------------------------------------
@@ -168,21 +171,37 @@ static Dictionary<string, string?> QueryParams(HttpContext ctx)
         StringComparer.OrdinalIgnoreCase);
 
 static async Task<IResult> Generate(string codigo, ReportFormat fmt,
-    IReadOnlyDictionary<string, string?> parametros, ReportService svc, CancellationToken ct)
+    IReadOnlyDictionary<string, string?> parametros, ReportService svc, CallLogService log, CancellationToken ct)
 {
+    var sw = Stopwatch.StartNew();
+    var query = string.Join("&", parametros
+        .Where(kv => !string.IsNullOrEmpty(kv.Value))
+        .Select(kv => $"{kv.Key}={kv.Value}"));
+
+    void Reg(bool ok, int status, string? err)
+        => log.Record(new CallEntry(DateTime.Now, codigo, fmt.ToString(), ok, status, sw.ElapsedMilliseconds, query, err));
+
     try
     {
         var req = new ReportRequest { Codigo = codigo, Format = fmt, Parametros = parametros };
         var output = await svc.GenerateAsync(req, ct);
+        Reg(true, 200, null);
         return Results.File(output.Content, output.ContentType, output.FileName);
     }
     catch (ReportNotFoundException e)
     {
+        Reg(false, 404, e.Message);
         return Results.NotFound(new { error = e.Message });
     }
     catch (ReportParameterException e)
     {
+        Reg(false, 400, e.Message);
         return Results.BadRequest(new { error = e.Message });
+    }
+    catch (Exception e)
+    {
+        Reg(false, 500, e.Message);
+        return Results.Problem(e.Message);
     }
 }
 

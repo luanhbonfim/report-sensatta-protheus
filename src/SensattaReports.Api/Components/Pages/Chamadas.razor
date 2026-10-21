@@ -1,0 +1,50 @@
+@page "/admin/chamadas"
+@implements IDisposable
+@inject CallLogService Calls
+
+<div class="page-head">
+    <div>
+        <h1>Chamadas do Protheus</h1>
+        <p class="muted">Histórico das requisições aos relatórios (atualiza sozinho)</p>
+    </div>
+    <button class="btn ghost" @onclick="() => { }">↻ Atualizar</button>
+</div>
+
+@if (!Calls.Recent(200).Any())
+{
+    <div class="empty">Nenhuma chamada registrada ainda. As requisições do Protheus aparecem aqui.</div>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr><th>Quando</th><th>Relatório</th><th>Formato</th><th>Status</th><th>Tempo</th><th>Parâmetros</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var c in Calls.Recent(200))
+            {
+                <tr>
+                    <td>@c.When.ToString("dd/MM/yyyy HH:mm:ss")</td>
+                    <td class="mono">@c.Codigo</td>
+                    <td>@c.Format</td>
+                    <td><span class="pill @(c.Ok ? "pill-ok" : "pill-err")">@c.Status</span></td>
+                    <td>@(c.Ms) ms</td>
+                    <td class="muted small">@c.Query</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    System.Timers.Timer? timer;
+
+    protected override void OnInitialized()
+    {
+        timer = new System.Timers.Timer(4000) { AutoReset = true };
+        timer.Elapsed += (_, _) => InvokeAsync(StateHasChanged);
+        timer.Start();
+    }
+
+    public void Dispose() => timer?.Dispose();
+}

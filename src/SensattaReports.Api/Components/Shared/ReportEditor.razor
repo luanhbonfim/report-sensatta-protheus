@@ -1,52 +1,9 @@
-@page "/admin"
 @inject IReportCatalog Catalog
 @inject ReportFileStore Store
 @inject IReportRepository Repo
 @inject ToastService Toasts
 
-<div class="page-head">
-    <div>
-        <h1>Relatórios</h1>
-        <p class="muted">Importe um report do catálogo, defina o SQL e os parâmetros, e teste.</p>
-    </div>
-    <button class="btn ghost" @onclick="CarregarCatalogo">↻ Recarregar</button>
-</div>
-
-<div class="toolbar">
-    <input class="in search" placeholder="🔍  Filtrar relatórios..." @bind="filtro" @bind:event="oninput" />
-    <span class="muted small">@Filtrados().Count() de @catalogo.Count</span>
-</div>
-
-@if (carregando)
-{
-    <div class="empty">Carregando catálogo…</div>
-}
-else if (!Filtrados().Any())
-{
-    <div class="empty">
-        @(catalogo.Count == 0
-            ? "Catálogo vazio — configure o Oracle para listar a SIGMA.REPORT."
-            : "Nenhum relatório para esse filtro.")
-    </div>
-}
-else
-{
-    <div class="cards">
-        @foreach (var it in Filtrados())
-        {
-            <div class="report-card" @onclick="() => Abrir(it)">
-                <div class="report-card-top">
-                    <span class="chip @(it.Imported ? "chip-ok" : "chip-muted")">@(it.Imported ? "ativo" : "novo")</span>
-                </div>
-                <div class="report-name">@it.Name</div>
-                <div class="report-cod">@it.Codigo</div>
-                <div class="report-action">@(it.Imported ? "Editar →" : "Configurar →")</div>
-            </div>
-        }
-    </div>
-}
-
-<Modal @bind-Visible="editorAberto" Title="@tituloModal">
+<Modal @bind-Visible="visible" Title="@titulo">
     <div class="form">
         <label>Código (URL / pasta)</label>
         <input class="in" @bind="codigo" />
@@ -64,7 +21,7 @@ else
 
         @if (parametros.Count > 0)
         {
-            <table class="tbl">
+            <table class="table mt">
                 <thead><tr><th>Bind</th><th>Tipo</th><th>Obrig.</th><th>Rótulo</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var p in parametros)
@@ -86,7 +43,7 @@ else
         }
 
         <div class="modal-actions">
-            <button class="btn" @onclick="() => editorAberto = false">Cancelar</button>
+            <button class="btn" @onclick="() => visible = false">Cancelar</button>
             <button class="btn primary" @onclick="Salvar" disabled="@(!PodeSalvar())">💾 Salvar</button>
         </div>
 
@@ -117,7 +74,7 @@ else
 </Modal>
 
 @code {
-    record Item(string Name, string Codigo, bool Imported);
+    [Parameter] public EventCallback OnSaved { get; set; }
 
     class ParamVm
     {
@@ -129,11 +86,7 @@ else
 
     readonly string[] Tipos = ["String", "Integer", "Decimal", "Date", "DateTime"];
 
-    List<Item> catalogo = new();
-    bool carregando = true;
-    string filtro = "";
-
-    bool editorAberto;
+    bool visible;
     string nome = "";
     string codigo = "";
     string sql = "";
@@ -143,45 +96,17 @@ else
     List<string> parametrosSalvos = new();
     readonly Dictionary<string, string> testeValores = new();
 
-    string tituloModal => string.IsNullOrWhiteSpace(nome) ? "Report" : $"Report — {nome}";
+    string titulo => string.IsNullOrWhiteSpace(nome) ? "Report" : $"Report — {nome}";
 
-    protected override async Task OnInitializedAsync() => await CarregarCatalogo();
-
-    async Task CarregarCatalogo()
+    public async Task OpenAsync(string name, string codigoInicial, bool imported)
     {
-        carregando = true;
-        try
-        {
-            var nomes = await Catalog.ListAsync();
-            var imp = Store.ListImported().ToHashSet(StringComparer.OrdinalIgnoreCase);
-            catalogo = nomes.Select(n => { var c = Slug.From(n); return new Item(n, c, imp.Contains(c)); }).ToList();
-        }
-        catch (Exception ex)
-        {
-            Toasts.Error("Falha ao ler o catálogo: " + ex.Message);
-            catalogo = new();
-        }
-        finally
-        {
-            carregando = false;
-        }
-    }
-
-    IEnumerable<Item> Filtrados()
-    {
-        var f = (filtro ?? "").ToLowerInvariant();
-        return catalogo.Where(i => i.Name.ToLowerInvariant().Contains(f) || i.Codigo.Contains(f));
-    }
-
-    async Task Abrir(Item it)
-    {
-        nome = it.Name; codigo = it.Codigo;
+        nome = name; codigo = codigoInicial;
         sql = ""; parametros = new();
         urlSalva = null; parametrosSalvos = new(); testeValores.Clear();
 
-        if (it.Imported)
+        if (imported)
         {
-            var def = await Repo.GetByCodigoAsync(it.Codigo);
+            var def = await Repo.GetByCodigoAsync(codigoInicial);
             if (def is not null)
             {
                 sql = def.Sql;
@@ -190,7 +115,8 @@ else
                     .ToList();
             }
         }
-        editorAberto = true;
+        visible = true;
+        StateHasChanged();
     }
 
     void Detectar()
@@ -227,7 +153,7 @@ else
 
         try
         {
-            await Store.SaveAsync(cod, sql, rtm!, ps);
+            await Store.SaveAsync(cod, string.IsNullOrWhiteSpace(nome) ? cod : nome, sql, rtm!, ps);
         }
         catch (Exception ex)
         {
@@ -241,8 +167,8 @@ else
         testeValores.Clear();
         foreach (var n in parametrosSalvos) testeValores[n] = "";
 
-        Toasts.Success($"Report \"{cod}\" salvo! Já disponível no endpoint.");
-        await CarregarCatalogo();
+        Toasts.Success($"Report \"{cod}\" salvo!");
+        await OnSaved.InvokeAsync();
     }
 
     string GetTeste(string name) => testeValores.TryGetValue(name, out var v) ? v : "";
