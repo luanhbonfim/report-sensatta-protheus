@@ -1,10 +1,10 @@
 @implements IDisposable
-@inject ToastService Toasts
+@inject ToastService Svc
 
 <div class="toast-stack">
-    @foreach (var t in Toasts.Items)
+    @foreach (var t in Svc.Items)
     {
-        <div class="toast @ToastClass(t.Level)" @onclick="() => Toasts.Remove(t.Id)">
+        <div class="toast @ToastClass(t.Level)" @onclick="() => Svc.Remove(t.Id)">
             <span class="toast-ic">@Icon(t.Level)</span>
             <span class="toast-msg">@t.Message</span>
         </div>
@@ -12,11 +12,11 @@
 </div>
 
 @code {
-    protected override void OnInitialized() => Toasts.OnChange += Handle;
+    protected override void OnInitialized() => Svc.OnChange += Handle;
 
     void Handle() => InvokeAsync(StateHasChanged);
 
-    public void Dispose() => Toasts.OnChange -= Handle;
+    public void Dispose() => Svc.OnChange -= Handle;
 
     static string ToastClass(ToastLevel l) => l switch
     {
