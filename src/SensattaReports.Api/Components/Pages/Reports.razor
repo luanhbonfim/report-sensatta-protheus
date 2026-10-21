@@ -2,114 +2,119 @@
 @inject IReportCatalog Catalog
 @inject ReportFileStore Store
 @inject IReportRepository Repo
+@inject ToastService Toasts
 
-<h1>Relatórios</h1>
-<p class="hint" style="margin:-4px 0 14px">
-    1) Escolha um report no catálogo · 2) Cole o SQL e detecte os parâmetros ·
-    3) Salve · 4) Teste gerando o PDF.
-</p>
+<div class="page-head">
+    <div>
+        <h1>Relatórios</h1>
+        <p class="muted">Importe um report do catálogo, defina o SQL e os parâmetros, e teste.</p>
+    </div>
+    <button class="btn ghost" @onclick="CarregarCatalogo">↻ Recarregar</button>
+</div>
 
-<div class="grid">
+<div class="toolbar">
+    <input class="in search" placeholder="🔍  Filtrar relatórios..." @bind="filtro" @bind:event="oninput" />
+    <span class="muted small">@Filtrados().Count() de @catalogo.Count</span>
+</div>
 
-    <section class="card">
-        <h2>Catálogo (SIGMA.REPORT)</h2>
-        <input class="in" placeholder="Filtrar..." @bind="filtro" @bind:event="oninput" />
-        <p class="hint">Clique para carregar. <span class="badge">ativo</span> = já importado.</p>
-        <div class="catalog">
-            @foreach (var it in Filtrados())
-            {
-                <div class="@ItemClass(it.Codigo)" @onclick="() => Selecionar(it)">
-                    <div class="row between">
-                        <strong>@it.Name</strong>
-                        @if (it.Imported) { <span class="badge">ativo</span> }
-                    </div>
-                    <div class="cod">@it.Codigo</div>
+@if (carregando)
+{
+    <div class="empty">Carregando catálogo…</div>
+}
+else if (!Filtrados().Any())
+{
+    <div class="empty">
+        @(catalogo.Count == 0
+            ? "Catálogo vazio — configure o Oracle para listar a SIGMA.REPORT."
+            : "Nenhum relatório para esse filtro.")
+    </div>
+}
+else
+{
+    <div class="cards">
+        @foreach (var it in Filtrados())
+        {
+            <div class="report-card" @onclick="() => Abrir(it)">
+                <div class="report-card-top">
+                    <span class="chip @(it.Imported ? "chip-ok" : "chip-muted")">@(it.Imported ? "ativo" : "novo")</span>
                 </div>
-            }
-            @if (catalogo.Count == 0)
-            {
-                <p class="hint">Catálogo vazio (configure o Oracle para listar a SIGMA.REPORT).</p>
-            }
-        </div>
-        <button class="btn" @onclick="CarregarCatalogo">↻ Recarregar</button>
-    </section>
+                <div class="report-name">@it.Name</div>
+                <div class="report-cod">@it.Codigo</div>
+                <div class="report-action">@(it.Imported ? "Editar →" : "Configurar →")</div>
+            </div>
+        }
+    </div>
+}
 
-    <section class="card">
-        <h2>Report</h2>
-
-        <label>Nome (catálogo)</label>
-        <input class="in" value="@nome" readonly />
-
+<Modal @bind-Visible="editorAberto" Title="@tituloModal">
+    <div class="form">
         <label>Código (URL / pasta)</label>
         <input class="in" @bind="codigo" />
 
         <label>SQL (com binds :nome)</label>
-        <textarea class="in ta" @bind="sql"></textarea>
+        <textarea class="in ta" @bind="sql" placeholder="SELECT ... WHERE data >= :data_ini AND data <= :data_fim ..."></textarea>
 
-        <div class="row mt">
-            <button class="btn" @onclick="Detectar">🔍 Detectar parâmetros</button>
-            <button class="btn" @onclick="() => parametros.Add(new ParamVm())">+ Parâmetro</button>
+        <div class="row between mt">
+            <span class="muted small">@parametros.Count parâmetro(s)</span>
+            <div class="row">
+                <button class="btn ghost sm" @onclick="Detectar">🔍 Detectar</button>
+                <button class="btn ghost sm" @onclick="() => parametros.Add(new ParamVm())">+ Parâmetro</button>
+            </div>
         </div>
 
-        <table class="tbl">
-            <thead>
-                <tr><th>Bind</th><th>Tipo</th><th>Obrig.</th><th>Rótulo</th><th></th></tr>
-            </thead>
-            <tbody>
-                @foreach (var p in parametros)
-                {
-                    <tr>
-                        <td><input class="in" @bind="p.Name" /></td>
-                        <td>
-                            <select class="in" @bind="p.Type">
-                                @foreach (var t in Tipos) { <option value="@t">@t</option> }
-                            </select>
-                        </td>
-                        <td class="center"><input type="checkbox" @bind="p.Required" /></td>
-                        <td><input class="in" @bind="p.Label" /></td>
-                        <td><button class="btn" @onclick="() => parametros.Remove(p)">✕</button></td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-
-        <div class="row mt">
-            <button class="btn primary" @onclick="Salvar" disabled="@(!PodeSalvar())">💾 Salvar / Importar</button>
-        </div>
-
-        @if (msg is not null)
+        @if (parametros.Count > 0)
         {
-            <div class="@MsgClass()">@msg</div>
+            <table class="tbl">
+                <thead><tr><th>Bind</th><th>Tipo</th><th>Obrig.</th><th>Rótulo</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var p in parametros)
+                    {
+                        <tr>
+                            <td><input class="in" @bind="p.Name" /></td>
+                            <td>
+                                <select class="in" @bind="p.Type">
+                                    @foreach (var t in Tipos) { <option value="@t">@t</option> }
+                                </select>
+                            </td>
+                            <td class="center"><input type="checkbox" @bind="p.Required" /></td>
+                            <td><input class="in" @bind="p.Label" /></td>
+                            <td><button class="icon-btn" @onclick="() => parametros.Remove(p)" title="Remover">✕</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
         }
+
+        <div class="modal-actions">
+            <button class="btn" @onclick="() => editorAberto = false">Cancelar</button>
+            <button class="btn primary" @onclick="Salvar" disabled="@(!PodeSalvar())">💾 Salvar</button>
+        </div>
 
         @if (urlSalva is not null)
         {
-            <label>Endpoint (para o Protheus)</label>
-            <div class="row">
-                <input class="in" readonly value="@urlSalva" />
-                <a class="btn" href="@urlSalva" target="_blank">Abrir</a>
-            </div>
-        }
+            <div class="saved">
+                <div class="muted small">Endpoint (para o Protheus)</div>
+                <div class="row">
+                    <input class="in mono" readonly value="@urlSalva" />
+                    <a class="btn ghost" href="@urlSalva" target="_blank">Abrir</a>
+                </div>
 
-        @if (testarCodigo is not null)
-        {
-            <div class="teste">
-                <h2>Testar</h2>
-                @foreach (var p in parametros)
-                {
-                    <label>@(string.IsNullOrWhiteSpace(p.Label) ? p.Name : p.Label) <span class="hint">(@p.Name)</span></label>
-                    <input class="in"
-                           @bind:get="GetTeste(p.Name)" @bind:set="(v) => SetTeste(p.Name, v)"
-                           placeholder="@Placeholder(p.Type)" />
-                }
-                <div class="row mt">
-                    <a class="btn" href='@LinkTeste("pdf")' target="_blank">📄 Gerar PDF</a>
-                    <a class="btn" href='@LinkTeste("xlsx")' target="_blank">📊 Gerar Excel</a>
+                <div class="test">
+                    <div class="muted small mt">Testar com valores:</div>
+                    @foreach (var nomeParam in parametrosSalvos)
+                    {
+                        <input class="in mt" placeholder="@nomeParam"
+                               @bind:get="GetTeste(nomeParam)" @bind:set="(v) => SetTeste(nomeParam, v)" />
+                    }
+                    <div class="row mt">
+                        <a class="btn" href="@LinkTeste("pdf")" target="_blank">📄 Gerar PDF</a>
+                        <a class="btn" href="@LinkTeste("xlsx")" target="_blank">📊 Gerar Excel</a>
+                    </div>
                 </div>
             </div>
         }
-    </section>
-</div>
+    </div>
+</Modal>
 
 @code {
     record Item(string Name, string Codigo, bool Imported);
@@ -125,25 +130,41 @@
     readonly string[] Tipos = ["String", "Integer", "Decimal", "Date", "DateTime"];
 
     List<Item> catalogo = new();
+    bool carregando = true;
     string filtro = "";
-    string? sel;
+
+    bool editorAberto;
     string nome = "";
     string codigo = "";
     string sql = "";
     List<ParamVm> parametros = new();
-    string? msg;
-    bool msgOk;
-    string? testarCodigo;
+
     string? urlSalva;
+    List<string> parametrosSalvos = new();
     readonly Dictionary<string, string> testeValores = new();
+
+    string tituloModal => string.IsNullOrWhiteSpace(nome) ? "Report" : $"Report — {nome}";
 
     protected override async Task OnInitializedAsync() => await CarregarCatalogo();
 
     async Task CarregarCatalogo()
     {
-        var nomes = await Catalog.ListAsync();
-        var imp = Store.ListImported().ToHashSet(StringComparer.OrdinalIgnoreCase);
-        catalogo = nomes.Select(n => { var c = Slug.From(n); return new Item(n, c, imp.Contains(c)); }).ToList();
+        carregando = true;
+        try
+        {
+            var nomes = await Catalog.ListAsync();
+            var imp = Store.ListImported().ToHashSet(StringComparer.OrdinalIgnoreCase);
+            catalogo = nomes.Select(n => { var c = Slug.From(n); return new Item(n, c, imp.Contains(c)); }).ToList();
+        }
+        catch (Exception ex)
+        {
+            Toasts.Error("Falha ao ler o catálogo: " + ex.Message);
+            catalogo = new();
+        }
+        finally
+        {
+            carregando = false;
+        }
     }
 
     IEnumerable<Item> Filtrados()
@@ -152,10 +173,12 @@
         return catalogo.Where(i => i.Name.ToLowerInvariant().Contains(f) || i.Codigo.Contains(f));
     }
 
-    async Task Selecionar(Item it)
+    async Task Abrir(Item it)
     {
-        sel = it.Codigo; nome = it.Name; codigo = it.Codigo;
-        sql = ""; parametros = new(); msg = null; testarCodigo = null; urlSalva = null;
+        nome = it.Name; codigo = it.Codigo;
+        sql = ""; parametros = new();
+        urlSalva = null; parametrosSalvos = new(); testeValores.Clear();
+
         if (it.Imported)
         {
             var def = await Repo.GetByCodigoAsync(it.Codigo);
@@ -167,23 +190,29 @@
                     .ToList();
             }
         }
+        editorAberto = true;
     }
 
     void Detectar()
-        => parametros = BindDetector.Detect(sql)
+    {
+        parametros = BindDetector.Detect(sql)
             .Select(b => new ParamVm { Name = b, Type = BindDetector.GuessType(b).ToString(), Required = true })
             .ToList();
+        Toasts.Info($"{parametros.Count} parâmetro(s) detectado(s).");
+    }
+
+    bool PodeSalvar() => !string.IsNullOrWhiteSpace(sql)
+        && !string.IsNullOrWhiteSpace(string.IsNullOrWhiteSpace(codigo) ? nome : codigo);
 
     async Task Salvar()
     {
         var cod = Slug.From(string.IsNullOrWhiteSpace(codigo) ? nome : codigo);
-        if (cod.Length == 0) { Msg("Código/nome inválido", false); return; }
-        if (string.IsNullOrWhiteSpace(sql)) { Msg("SQL obrigatório", false); return; }
+        if (cod.Length == 0) { Toasts.Error("Código/nome inválido."); return; }
+        if (string.IsNullOrWhiteSpace(sql)) { Toasts.Error("Informe o SQL."); return; }
 
-        // template: do catalogo pelo nome; senao, o que ja esta no disco (edicao)
         var rtm = await Catalog.GetTemplateAsync(nome);
         if (string.IsNullOrWhiteSpace(rtm)) rtm = (await Repo.GetByCodigoAsync(cod))?.TemplateRtm;
-        if (string.IsNullOrWhiteSpace(rtm)) { Msg("Template (.rtm) não encontrado", false); return; }
+        if (string.IsNullOrWhiteSpace(rtm)) { Toasts.Error("Template (.rtm) não encontrado."); return; }
 
         var ps = parametros
             .Where(p => !string.IsNullOrWhiteSpace(p.Name))
@@ -196,14 +225,23 @@
             })
             .ToList();
 
-        await Store.SaveAsync(cod, sql, rtm!, ps);
+        try
+        {
+            await Store.SaveAsync(cod, sql, rtm!, ps);
+        }
+        catch (Exception ex)
+        {
+            Toasts.Error("Erro ao salvar: " + ex.Message);
+            return;
+        }
 
         codigo = cod;
-        testarCodigo = cod;
-        testeValores.Clear();
-        foreach (var p in ps) testeValores[p.Name] = "";
         urlSalva = $"/reports/{cod}/pdf";
-        Msg("Salvo com sucesso!", true);
+        parametrosSalvos = ps.Select(p => p.Name).ToList();
+        testeValores.Clear();
+        foreach (var n in parametrosSalvos) testeValores[n] = "";
+
+        Toasts.Success($"Report \"{cod}\" salvo! Já disponível no endpoint.");
         await CarregarCatalogo();
     }
 
@@ -212,17 +250,9 @@
 
     string LinkTeste(string fmt)
     {
-        var qs = string.Join("&", parametros
-            .Where(p => testeValores.TryGetValue(p.Name, out var v) && !string.IsNullOrWhiteSpace(v))
-            .Select(p => Uri.EscapeDataString(p.Name) + "=" + Uri.EscapeDataString(testeValores[p.Name])));
-        return $"/reports/{Uri.EscapeDataString(testarCodigo!)}/{fmt}" + (qs.Length > 0 ? "?" + qs : "");
+        var qs = string.Join("&", parametrosSalvos
+            .Where(n => testeValores.TryGetValue(n, out var v) && !string.IsNullOrWhiteSpace(v))
+            .Select(n => Uri.EscapeDataString(n) + "=" + Uri.EscapeDataString(testeValores[n])));
+        return $"/reports/{Uri.EscapeDataString(codigo)}/{fmt}" + (qs.Length > 0 ? "?" + qs : "");
     }
-
-    bool PodeSalvar() => !string.IsNullOrWhiteSpace(sql)
-        && !string.IsNullOrWhiteSpace(string.IsNullOrWhiteSpace(codigo) ? nome : codigo);
-    string ItemClass(string cod) => sel == cod ? "item sel" : "item";
-    string MsgClass() => msgOk ? "msg ok" : "msg err";
-    static string Placeholder(string type) => type == "Date" ? "2026-10-20" : "";
-
-    void Msg(string text, bool ok) { msg = text; msgOk = ok; }
 }

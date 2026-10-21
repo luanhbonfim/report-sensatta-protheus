@@ -70,6 +70,7 @@ builder.Services.AddSingleton<ReportService>();
 
 // Blazor Server — o painel /admin.
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+builder.Services.AddScoped<SensattaReports.Api.Services.ToastService>();
 
 // Autenticacao por cookie para o painel. Credenciais em Admin:User/Admin:Password.
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

@@ -1,0 +1,29 @@
+@if (Visible)
+{
+    <div class="modal-backdrop" @onclick="Backdrop">
+        <div class="modal-card" @onclick:stopPropagation="true">
+            <div class="modal-head">
+                <h3>@Title</h3>
+                <button class="icon-btn" @onclick="CloseAsync" title="Fechar">✕</button>
+            </div>
+            <div class="modal-body">
+                @ChildContent
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool CloseOnBackdrop { get; set; } = true;
+
+    async Task CloseAsync() => await VisibleChanged.InvokeAsync(false);
+
+    async Task Backdrop()
+    {
+        if (CloseOnBackdrop) await CloseAsync();
+    }
+}
