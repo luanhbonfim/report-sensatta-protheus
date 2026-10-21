@@ -193,7 +193,7 @@
     }
 
     string GetTeste(string name) => testeValores.TryGetValue(name, out var v) ? v : "";
-    void SetTeste(string name, string value) => testeValores[name] = value;
+    void SetTeste(string name, string? value) => testeValores[name] = value ?? "";
 
     string LinkTeste(string fmt)
     {
