@@ -1,0 +1,211 @@
+@page "/admin"
+@inject IReportCatalog Catalog
+@inject ReportFileStore Store
+@inject IReportRepository Repo
+
+<h1>Relatórios</h1>
+
+<div class="grid">
+
+    <section class="card">
+        <h2>Catálogo (SIGMA.REPORT)</h2>
+        <input class="in" placeholder="Filtrar..." @bind="filtro" @bind:event="oninput" />
+        <p class="hint">Clique para carregar. <span class="badge">ativo</span> = já importado.</p>
+        <div class="catalog">
+            @foreach (var it in Filtrados())
+            {
+                <div class="@ItemClass(it.Codigo)" @onclick="() => Selecionar(it)">
+                    <div class="row between">
+                        <strong>@it.Name</strong>
+                        @if (it.Imported) { <span class="badge">ativo</span> }
+                    </div>
+                    <div class="cod">@it.Codigo</div>
+                </div>
+            }
+            @if (catalogo.Count == 0)
+            {
+                <p class="hint">Catálogo vazio (configure o Oracle para listar a SIGMA.REPORT).</p>
+            }
+        </div>
+        <button class="btn" @onclick="CarregarCatalogo">↻ Recarregar</button>
+    </section>
+
+    <section class="card">
+        <h2>Report</h2>
+
+        <label>Nome (catálogo)</label>
+        <input class="in" value="@nome" readonly />
+
+        <label>Código (URL / pasta)</label>
+        <input class="in" @bind="codigo" />
+
+        <label>SQL (com binds :nome)</label>
+        <textarea class="in ta" @bind="sql"></textarea>
+
+        <div class="row mt">
+            <button class="btn" @onclick="Detectar">🔍 Detectar parâmetros</button>
+            <button class="btn" @onclick="() => parametros.Add(new ParamVm())">+ Parâmetro</button>
+        </div>
+
+        <table class="tbl">
+            <thead>
+                <tr><th>Bind</th><th>Tipo</th><th>Obrig.</th><th>Rótulo</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var p in parametros)
+                {
+                    <tr>
+                        <td><input class="in" @bind="p.Name" /></td>
+                        <td>
+                            <select class="in" @bind="p.Type">
+                                @foreach (var t in Tipos) { <option value="@t">@t</option> }
+                            </select>
+                        </td>
+                        <td class="center"><input type="checkbox" @bind="p.Required" /></td>
+                        <td><input class="in" @bind="p.Label" /></td>
+                        <td><button class="btn" @onclick="() => parametros.Remove(p)">✕</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="row mt">
+            <button class="btn primary" @onclick="Salvar">💾 Salvar / Importar</button>
+        </div>
+
+        @if (msg is not null)
+        {
+            <div class="@MsgClass()">@msg</div>
+        }
+
+        @if (testarCodigo is not null)
+        {
+            <div class="teste">
+                <h2>Testar</h2>
+                @foreach (var p in parametros)
+                {
+                    <label>@(string.IsNullOrWhiteSpace(p.Label) ? p.Name : p.Label) <span class="hint">(@p.Name)</span></label>
+                    <input class="in"
+                           @bind:get="GetTeste(p.Name)" @bind:set="(v) => SetTeste(p.Name, v)"
+                           placeholder="@Placeholder(p.Type)" />
+                }
+                <div class="row mt">
+                    <a class="btn" href='@LinkTeste("pdf")' target="_blank">📄 Gerar PDF</a>
+                    <a class="btn" href='@LinkTeste("xlsx")' target="_blank">📊 Gerar Excel</a>
+                </div>
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    record Item(string Name, string Codigo, bool Imported);
+
+    class ParamVm
+    {
+        public string Name = "";
+        public string Type = "String";
+        public bool Required = true;
+        public string? Label;
+    }
+
+    readonly string[] Tipos = ["String", "Integer", "Decimal", "Date", "DateTime"];
+
+    List<Item> catalogo = new();
+    string filtro = "";
+    string? sel;
+    string nome = "";
+    string codigo = "";
+    string sql = "";
+    List<ParamVm> parametros = new();
+    string? msg;
+    bool msgOk;
+    string? testarCodigo;
+    readonly Dictionary<string, string> testeValores = new();
+
+    protected override async Task OnInitializedAsync() => await CarregarCatalogo();
+
+    async Task CarregarCatalogo()
+    {
+        var nomes = await Catalog.ListAsync();
+        var imp = Store.ListImported().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        catalogo = nomes.Select(n => { var c = Slug.From(n); return new Item(n, c, imp.Contains(c)); }).ToList();
+    }
+
+    IEnumerable<Item> Filtrados()
+    {
+        var f = (filtro ?? "").ToLowerInvariant();
+        return catalogo.Where(i => i.Name.ToLowerInvariant().Contains(f) || i.Codigo.Contains(f));
+    }
+
+    async Task Selecionar(Item it)
+    {
+        sel = it.Codigo; nome = it.Name; codigo = it.Codigo;
+        sql = ""; parametros = new(); msg = null; testarCodigo = null;
+        if (it.Imported)
+        {
+            var def = await Repo.GetByCodigoAsync(it.Codigo);
+            if (def is not null)
+            {
+                sql = def.Sql;
+                parametros = def.Parametros
+                    .Select(p => new ParamVm { Name = p.Name, Type = p.Type.ToString(), Required = p.Required, Label = p.Label })
+                    .ToList();
+            }
+        }
+    }
+
+    void Detectar()
+        => parametros = BindDetector.Detect(sql)
+            .Select(b => new ParamVm { Name = b, Type = BindDetector.GuessType(b).ToString(), Required = true })
+            .ToList();
+
+    async Task Salvar()
+    {
+        var cod = Slug.From(string.IsNullOrWhiteSpace(codigo) ? nome : codigo);
+        if (cod.Length == 0) { Msg("Código/nome inválido", false); return; }
+        if (string.IsNullOrWhiteSpace(sql)) { Msg("SQL obrigatório", false); return; }
+
+        // template: do catalogo pelo nome; senao, o que ja esta no disco (edicao)
+        var rtm = await Catalog.GetTemplateAsync(nome);
+        if (string.IsNullOrWhiteSpace(rtm)) rtm = (await Repo.GetByCodigoAsync(cod))?.TemplateRtm;
+        if (string.IsNullOrWhiteSpace(rtm)) { Msg("Template (.rtm) não encontrado", false); return; }
+
+        var ps = parametros
+            .Where(p => !string.IsNullOrWhiteSpace(p.Name))
+            .Select(p => new ReportParameter
+            {
+                Name = p.Name,
+                Type = Enum.TryParse<ReportParameterType>(p.Type, true, out var t) ? t : ReportParameterType.String,
+                Required = p.Required,
+                Label = string.IsNullOrWhiteSpace(p.Label) ? null : p.Label
+            })
+            .ToList();
+
+        await Store.SaveAsync(cod, sql, rtm!, ps);
+
+        codigo = cod;
+        testarCodigo = cod;
+        testeValores.Clear();
+        foreach (var p in ps) testeValores[p.Name] = "";
+        Msg($"Salvo! Disponível em /reports/{cod}/pdf", true);
+        await CarregarCatalogo();
+    }
+
+    string GetTeste(string name) => testeValores.TryGetValue(name, out var v) ? v : "";
+    void SetTeste(string name, string value) => testeValores[name] = value;
+
+    string LinkTeste(string fmt)
+    {
+        var qs = string.Join("&", parametros
+            .Where(p => testeValores.TryGetValue(p.Name, out var v) && !string.IsNullOrWhiteSpace(v))
+            .Select(p => Uri.EscapeDataString(p.Name) + "=" + Uri.EscapeDataString(testeValores[p.Name])));
+        return $"/reports/{Uri.EscapeDataString(testarCodigo!)}/{fmt}" + (qs.Length > 0 ? "?" + qs : "");
+    }
+
+    string ItemClass(string cod) => sel == cod ? "item sel" : "item";
+    string MsgClass() => msgOk ? "msg ok" : "msg err";
+    static string Placeholder(string type) => type == "Date" ? "2026-10-20" : "";
+
+    void Msg(string text, bool ok) { msg = text; msgOk = ok; }
+}

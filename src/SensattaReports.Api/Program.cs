@@ -1,3 +1,4 @@
+using SensattaReports.Api.Components;
 using SensattaReports.Core;
 using SensattaReports.Core.Abstractions;
 using SensattaReports.Core.Models;
@@ -64,10 +65,14 @@ builder.Services.AddSingleton(new ReportServiceOptions
 });
 builder.Services.AddSingleton<ReportService>();
 
+// Blazor Server — o painel /admin.
+builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+
 var app = builder.Build();
 
-// Serve o painel (wwwroot/admin.html) e demais arquivos estaticos.
+// Arquivos estaticos (CSS do painel etc.) + antiforgery exigido pelo Blazor.
 app.UseStaticFiles();
+app.UseAntiforgery();
 
 // Log de diagnostico: mostra no console qual fonte de dados esta ativa.
 app.Logger.LogInformation("Repositorio de reports: {ReportSource}", reportSource);
@@ -93,92 +98,13 @@ app.MapPost("/reports/{codigo}", async (string codigo, GerarDto body, ReportServ
 });
 
 // ---------------------------------------------------------------------------
-// Painel administrativo: HTML em wwwroot/admin.html + API abaixo.
-// IMPORTANTE: proteja no nivel de rede — nao exponha publicamente. Pode
-// desligar com Admin:Enabled=false no appsettings.
+// Painel administrativo em Blazor Server (/admin). Os componentes chamam os
+// servicos (IReportCatalog, ReportFileStore, ReportService) diretamente.
+// IMPORTANTE: proteja /admin no nivel de rede. Desligavel com Admin:Enabled=false.
 // ---------------------------------------------------------------------------
 if (app.Configuration.GetValue("Admin:Enabled", true))
 {
-    app.MapGet("/admin", () => Results.Redirect("/admin.html"));
-
-    // lista o catalogo (SIGMA.REPORT) + marca quais ja foram importados
-    app.MapGet("/admin/api/catalog", async (IReportCatalog cat, ReportFileStore store, CancellationToken ct) =>
-    {
-        var nomes = await cat.ListAsync(ct);
-        var importados = store.ListImported().ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var itens = nomes.Select(n =>
-        {
-            var codigo = Slug.From(n);
-            return new { name = n, codigo, imported = importados.Contains(codigo) };
-        });
-        return Results.Ok(itens);
-    });
-
-    // template (.rtm) de um report do catalogo
-    app.MapGet("/admin/api/catalog/template", async (string name, IReportCatalog cat, CancellationToken ct) =>
-    {
-        var tpl = await cat.GetTemplateAsync(name, ct);
-        return tpl is null
-            ? Results.NotFound(new { error = "template nao encontrado" })
-            : Results.Ok(new { name, template = tpl });
-    });
-
-    // detecta os binds do SQL e sugere parametros
-    app.MapPost("/admin/api/detect-binds", (DetectDto body) =>
-    {
-        var binds = BindDetector.Detect(body.Sql);
-        return Results.Ok(binds.Select(b => new
-        {
-            name = b,
-            type = BindDetector.GuessType(b).ToString(),
-            required = true,
-            label = (string?)null
-        }));
-    });
-
-    // report ja importado (para edicao)
-    app.MapGet("/admin/api/reports/{codigo}", async (string codigo, IReportRepository repo, CancellationToken ct) =>
-    {
-        var def = await repo.GetByCodigoAsync(codigo, ct);
-        return def is null
-            ? Results.NotFound()
-            : Results.Ok(new
-            {
-                def.Codigo,
-                def.Sql,
-                parametros = def.Parametros.Select(p => new { name = p.Name, type = p.Type.ToString(), required = p.Required, label = p.Label })
-            });
-    });
-
-    // importa/atualiza: grava os arquivos em reports/<codigo>/
-    app.MapPost("/admin/api/reports", async (ImportDto body, IReportCatalog cat, ReportFileStore store, IReportRepository repo, CancellationToken ct) =>
-    {
-        var codigo = Slug.From(body.Codigo ?? body.Name);
-        if (codigo.Length == 0) return Results.BadRequest(new { error = "codigo/nome invalido" });
-        if (string.IsNullOrWhiteSpace(body.Sql)) return Results.BadRequest(new { error = "SQL obrigatorio" });
-
-        // 1) template enviado; 2) do catalogo pelo nome; 3) o que ja esta no disco (edicao)
-        var rtm = body.Template;
-        if (string.IsNullOrWhiteSpace(rtm) && !string.IsNullOrWhiteSpace(body.Name))
-            rtm = await cat.GetTemplateAsync(body.Name, ct);
-        if (string.IsNullOrWhiteSpace(rtm))
-            rtm = (await repo.GetByCodigoAsync(codigo, ct))?.TemplateRtm;
-        if (string.IsNullOrWhiteSpace(rtm)) return Results.BadRequest(new { error = "template (.rtm) nao encontrado" });
-
-        var parametros = (body.Parametros ?? [])
-            .Where(p => !string.IsNullOrWhiteSpace(p.Name))
-            .Select(p => new ReportParameter
-            {
-                Name = p.Name,
-                Type = Enum.TryParse<ReportParameterType>(p.Type, true, out var t) ? t : ReportParameterType.String,
-                Required = p.Required,
-                Label = string.IsNullOrWhiteSpace(p.Label) ? null : p.Label
-            })
-            .ToList();
-
-        await store.SaveAsync(codigo, body.Sql!, rtm!, parametros, ct);
-        return Results.Ok(new { codigo, url = $"/reports/{codigo}/pdf" });
-    });
+    app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 }
 
 app.Run();
@@ -226,8 +152,5 @@ static string ResolveDir(WebApplicationBuilder b)
     return Path.Combine(AppContext.BaseDirectory, sub);
 }
 
-// DTOs dos corpos JSON
+// DTO do corpo do POST /reports/{codigo}
 record GerarDto(string? Format, Dictionary<string, string?>? Parametros);
-record DetectDto(string? Sql);
-record ParamDto(string Name, string? Type, bool Required, string? Label);
-record ImportDto(string? Name, string? Codigo, string? Sql, string? Template, ParamDto[]? Parametros);
