@@ -1,4 +1,3 @@
-using System.Text;
 using PdfSharp.Drawing;
 using PdfSharp.Fonts;
 using PdfSharp.Pdf;
@@ -397,7 +396,12 @@ public sealed class PdfReportRenderer : IReportRenderer
         _ => string.Empty
     };
 
-    /// <summary>Quebra o texto em linhas respeitando a largura (word-wrap) e os \n.</summary>
+    /// <summary>
+    /// Quebra o texto em linhas respeitando a largura e os \n. Faz word-wrap
+    /// normal; quando um "token" sozinho nao cabe na largura (ex.: o memo de
+    /// itens "#001-29,836#002-..." que nao tem espacos), quebra no nivel do
+    /// caractere, igual ao ReportBuilder.
+    /// </summary>
     private static List<string> WrapLines(XGraphics gfx, string text, XFont font,
         double maxWidthPt, bool charWrap)
     {
@@ -409,25 +413,67 @@ public sealed class PdfReportRenderer : IReportRenderer
         {
             if (para.Length == 0) { result.Add(string.Empty); continue; }
 
-            var line = new StringBuilder();
+            var line = string.Empty;
             foreach (var word in para.Split(' '))
             {
                 var trial = line.Length == 0 ? word : line + " " + word;
-                if (line.Length == 0 || gfx.MeasureString(trial, font).Width <= maxWidthPt)
+                if (gfx.MeasureString(trial, font).Width <= maxWidthPt)
                 {
-                    if (line.Length > 0) line.Append(' ');
-                    line.Append(word);
+                    line = trial; // cabe na linha atual
+                    continue;
+                }
+
+                // nao cabe: fecha a linha corrente
+                if (line.Length > 0) { result.Add(line); line = string.Empty; }
+
+                if (gfx.MeasureString(word, font).Width <= maxWidthPt)
+                {
+                    line = word; // o token cabe sozinho numa linha
                 }
                 else
                 {
-                    result.Add(line.ToString());
-                    line.Clear();
-                    line.Append(word);
+                    // token grande demais: quebra em pedacos que caibam
+                    var chunks = BreakLongToken(gfx, word, font, maxWidthPt);
+                    for (var k = 0; k < chunks.Count - 1; k++) result.Add(chunks[k]);
+                    line = chunks[^1];
                 }
             }
-            result.Add(line.ToString());
+            result.Add(line);
         }
         return result;
+    }
+
+    /// <summary>
+    /// Parte um token sem espacos em pedacos que caibam na largura (char-wrap),
+    /// usando busca binaria no comprimento para medir poucas vezes.
+    /// </summary>
+    private static List<string> BreakLongToken(XGraphics gfx, string token, XFont font,
+        double maxWidthPt)
+    {
+        var chunks = new List<string>();
+        var start = 0;
+        while (start < token.Length)
+        {
+            var lo = 1;
+            var hi = token.Length - start;
+            var best = 1; // garante progresso mesmo se 1 char ja estourar
+            while (lo <= hi)
+            {
+                var mid = (lo + hi) / 2;
+                if (gfx.MeasureString(token.Substring(start, mid), font).Width <= maxWidthPt)
+                {
+                    best = mid;
+                    lo = mid + 1;
+                }
+                else
+                {
+                    hi = mid - 1;
+                }
+            }
+            chunks.Add(token.Substring(start, best));
+            start += best;
+        }
+        return chunks;
     }
 
     private static XFont BuildFont(RbFont f)
