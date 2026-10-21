@@ -2,39 +2,46 @@
 @implements IDisposable
 @inject CallLogService Calls
 
-<div class="page-head">
+<div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-        <h1>Chamadas do Protheus</h1>
-        <p class="muted">Histórico das requisições aos relatórios (atualiza sozinho)</p>
+        <h4 class="fw-bold mb-0">Chamadas do Protheus</h4>
+        <div class="text-muted small">Histórico das requisições aos relatórios · atualiza sozinho</div>
     </div>
-    <button class="btn ghost" @onclick="() => { }">↻ Atualizar</button>
+    <span class="badge text-bg-light"><i class="bi bi-arrow-repeat me-1"></i>ao vivo</span>
 </div>
 
-@if (!Calls.Recent(200).Any())
-{
-    <div class="empty">Nenhuma chamada registrada ainda. As requisições do Protheus aparecem aqui.</div>
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr><th>Quando</th><th>Relatório</th><th>Formato</th><th>Status</th><th>Tempo</th><th>Parâmetros</th></tr>
-        </thead>
-        <tbody>
-            @foreach (var c in Calls.Recent(200))
-            {
-                <tr>
-                    <td>@c.When.ToString("dd/MM/yyyy HH:mm:ss")</td>
-                    <td class="mono">@c.Codigo</td>
-                    <td>@c.Format</td>
-                    <td><span class="pill @(c.Ok ? "pill-ok" : "pill-err")">@c.Status</span></td>
-                    <td>@(c.Ms) ms</td>
-                    <td class="muted small">@c.Query</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
+<div class="card">
+    <div class="card-body p-0">
+        @if (!Calls.Recent(200).Any())
+        {
+            <div class="p-4 text-center text-muted">Nenhuma chamada registrada ainda. As requisições do Protheus aparecem aqui.</div>
+        }
+        else
+        {
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr><th class="ps-3">Quando</th><th>Relatório</th><th>Formato</th><th>Status</th><th>Tempo</th><th>Parâmetros</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in Calls.Recent(200))
+                    {
+                        <tr>
+                            <td class="ps-3">@c.When.ToString("dd/MM/yyyy HH:mm:ss")</td>
+                            <td class="fw-semibold">@c.Codigo</td>
+                            <td><span class="badge text-bg-light">@c.Format</span></td>
+                            <td>
+                                @if (c.Ok) { <span class="badge text-bg-success">@c.Status</span> }
+                                else { <span class="badge text-bg-danger">@c.Status</span> }
+                            </td>
+                            <td>@(c.Ms) ms</td>
+                            <td class="text-muted small font-monospace">@c.Query</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
 
 @code {
     System.Timers.Timer? timer;

@@ -1,34 +1,21 @@
 @implements IDisposable
 @inject ToastService Svc
 
-<div class="toast-stack">
+<div class="rp-toast-stack">
     @foreach (var t in Svc.Items)
     {
-        <div class="toast @ToastClass(t.Level)" @onclick="() => Svc.Remove(t.Id)">
-            <span class="toast-ic">@Icon(t.Level)</span>
-            <span class="toast-msg">@t.Message</span>
+        <div class="rp-toast @Cls(t.Level)" @onclick="() => Svc.Remove(t.Id)">
+            <span class="ic">@Ic(t.Level)</span>
+            <span>@t.Message</span>
         </div>
     }
 </div>
 
 @code {
     protected override void OnInitialized() => Svc.OnChange += Handle;
-
     void Handle() => InvokeAsync(StateHasChanged);
-
     public void Dispose() => Svc.OnChange -= Handle;
 
-    static string ToastClass(ToastLevel l) => l switch
-    {
-        ToastLevel.Success => "toast-ok",
-        ToastLevel.Error => "toast-err",
-        _ => "toast-info"
-    };
-
-    static string Icon(ToastLevel l) => l switch
-    {
-        ToastLevel.Success => "✓",
-        ToastLevel.Error => "✕",
-        _ => "ℹ"
-    };
+    static string Cls(ToastLevel l) => l switch { ToastLevel.Success => "ok", ToastLevel.Error => "err", _ => "info" };
+    static string Ic(ToastLevel l) => l switch { ToastLevel.Success => "✓", ToastLevel.Error => "✕", _ => "i" };
 }

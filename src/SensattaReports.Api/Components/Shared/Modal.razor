@@ -1,12 +1,12 @@
 @if (Visible)
 {
-    <div class="modal-backdrop" @onclick="Backdrop">
-        <div class="modal-card" @onclick:stopPropagation="true">
-            <div class="modal-head">
-                <h3>@Title</h3>
-                <button class="icon-btn" @onclick="CloseAsync" title="Fechar">✕</button>
+    <div class="rp-modal-backdrop" @onclick="Backdrop">
+        <div class="rp-modal" @onclick:stopPropagation="true">
+            <div class="rp-modal-head">
+                <h5>@Title</h5>
+                <button type="button" class="btn-close" @onclick="CloseAsync" aria-label="Fechar"></button>
             </div>
-            <div class="modal-body">
+            <div class="rp-modal-body">
                 @ChildContent
             </div>
         </div>

@@ -4,73 +4,76 @@
 @inject ToastService Toasts
 
 <Modal @bind-Visible="visible" Title="@titulo">
-    <div class="form">
-        <label>Código (URL / pasta)</label>
-        <input class="in" @bind="codigo" />
+    <div class="mb-3">
+        <label class="form-label fw-semibold">Código (URL / pasta)</label>
+        <input class="form-control" @bind="codigo" />
+    </div>
 
-        <label>SQL (com binds :nome)</label>
-        <textarea class="in ta" @bind="sql" placeholder="SELECT ... WHERE data >= :data_ini AND data <= :data_fim ..."></textarea>
+    <div class="mb-2">
+        <label class="form-label fw-semibold">SQL (com binds :nome)</label>
+        <textarea class="form-control font-monospace" rows="7" @bind="sql"
+                  placeholder="SELECT ... WHERE data >= :data_ini AND data <= :data_fim ..."></textarea>
+    </div>
 
-        <div class="row between mt">
-            <span class="muted small">@parametros.Count parâmetro(s)</span>
-            <div class="row">
-                <button class="btn ghost sm" @onclick="Detectar">🔍 Detectar</button>
-                <button class="btn ghost sm" @onclick="() => parametros.Add(new ParamVm())">+ Parâmetro</button>
-            </div>
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted small">@parametros.Count parâmetro(s)</span>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-secondary" @onclick="Detectar"><i class="bi bi-search me-1"></i>Detectar</button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="() => parametros.Add(new ParamVm())"><i class="bi bi-plus-lg me-1"></i>Parâmetro</button>
         </div>
+    </div>
 
-        @if (parametros.Count > 0)
-        {
-            <table class="table mt">
-                <thead><tr><th>Bind</th><th>Tipo</th><th>Obrig.</th><th>Rótulo</th><th></th></tr></thead>
+    @if (parametros.Count > 0)
+    {
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead><tr><th>Bind</th><th>Tipo</th><th class="text-center">Obrig.</th><th>Rótulo</th><th></th></tr></thead>
                 <tbody>
                     @foreach (var p in parametros)
                     {
                         <tr>
-                            <td><input class="in" @bind="p.Name" /></td>
+                            <td><input class="form-control form-control-sm" @bind="p.Name" /></td>
                             <td>
-                                <select class="in" @bind="p.Type">
+                                <select class="form-select form-select-sm" @bind="p.Type">
                                     @foreach (var t in Tipos) { <option value="@t">@t</option> }
                                 </select>
                             </td>
-                            <td class="center"><input type="checkbox" @bind="p.Required" /></td>
-                            <td><input class="in" @bind="p.Label" /></td>
-                            <td><button class="icon-btn" @onclick="() => parametros.Remove(p)" title="Remover">✕</button></td>
+                            <td class="text-center"><input class="form-check-input" type="checkbox" @bind="p.Required" /></td>
+                            <td><input class="form-control form-control-sm" @bind="p.Label" /></td>
+                            <td><button class="btn btn-sm btn-link text-danger p-0" @onclick="() => parametros.Remove(p)" title="Remover"><i class="bi bi-x-lg"></i></button></td>
                         </tr>
                     }
                 </tbody>
             </table>
-        }
-
-        <div class="modal-actions">
-            <button class="btn" @onclick="() => visible = false">Cancelar</button>
-            <button class="btn primary" @onclick="Salvar" disabled="@(!PodeSalvar())">💾 Salvar</button>
         </div>
+    }
 
-        @if (urlSalva is not null)
-        {
-            <div class="saved">
-                <div class="muted small">Endpoint (para o Protheus)</div>
-                <div class="row">
-                    <input class="in mono" readonly value="@urlSalva" />
-                    <a class="btn ghost" href="@urlSalva" target="_blank">Abrir</a>
-                </div>
-
-                <div class="test">
-                    <div class="muted small mt">Testar com valores:</div>
-                    @foreach (var nomeParam in parametrosSalvos)
-                    {
-                        <input class="in mt" placeholder="@nomeParam"
-                               @bind:get="GetTeste(nomeParam)" @bind:set="(v) => SetTeste(nomeParam, v)" />
-                    }
-                    <div class="row mt">
-                        <a class="btn" href="@LinkTeste("pdf")" target="_blank">📄 Gerar PDF</a>
-                        <a class="btn" href="@LinkTeste("xlsx")" target="_blank">📊 Gerar Excel</a>
-                    </div>
-                </div>
-            </div>
-        }
+    <div class="d-flex justify-content-end gap-2 mt-3">
+        <button class="btn btn-outline-secondary" @onclick="() => visible = false">Cancelar</button>
+        <button class="btn btn-primary" @onclick="Salvar" disabled="@(!PodeSalvar())"><i class="bi bi-save me-1"></i>Salvar</button>
     </div>
+
+    @if (urlSalva is not null)
+    {
+        <div class="border-top mt-3 pt-3">
+            <label class="form-label text-muted small mb-1">Endpoint (para o Protheus)</label>
+            <div class="input-group input-group-sm mb-3">
+                <input class="form-control font-monospace" readonly value="@urlSalva" />
+                <a class="btn btn-outline-secondary" href="@urlSalva" target="_blank"><i class="bi bi-box-arrow-up-right"></i></a>
+            </div>
+
+            <label class="form-label text-muted small mb-1">Testar com valores</label>
+            @foreach (var nomeParam in parametrosSalvos)
+            {
+                <input class="form-control form-control-sm mb-2" placeholder="@nomeParam"
+                       @bind:get="GetTeste(nomeParam)" @bind:set="(v) => SetTeste(nomeParam, v)" />
+            }
+            <div class="d-flex gap-2">
+                <a class="btn btn-sm btn-primary" href="@LinkTeste("pdf")" target="_blank"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
+                <a class="btn btn-sm btn-success" href="@LinkTeste("xlsx")" target="_blank"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+            </div>
+        </div>
+    }
 </Modal>
 
 @code {

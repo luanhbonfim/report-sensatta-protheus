@@ -2,43 +2,48 @@
 @inject ReportFileStore Store
 @inject IReportRepository Repo
 
-<div class="page-head">
+<div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-        <h1>Relatórios</h1>
-        <p class="muted">Relatórios importados e seus endpoints</p>
+        <h4 class="fw-bold mb-0">Relatórios</h4>
+        <div class="text-muted small">Relatórios importados e seus endpoints</div>
     </div>
-    <a class="btn primary" href="/admin/importar">＋ Importar</a>
+    <a class="btn btn-primary" href="/admin/importar"><i class="bi bi-plus-circle me-1"></i>Importar</a>
 </div>
 
-@if (itens.Count == 0)
-{
-    <div class="empty">
-        Nenhum relatório importado ainda. <a class="link" href="/admin/importar">Importe o primeiro →</a>
+<div class="card">
+    <div class="card-body p-0">
+        @if (itens.Count == 0)
+        {
+            <div class="p-4 text-center text-muted">
+                Nenhum relatório importado ainda.
+                <a class="text-decoration-none" href="/admin/importar">Importe o primeiro →</a>
+            </div>
+        }
+        else
+        {
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr><th class="ps-3">Nome</th><th>Código</th><th>Params</th><th>Endpoint (PDF)</th><th class="text-end pe-3">Ações</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in itens)
+                    {
+                        <tr>
+                            <td class="ps-3 fw-semibold">@r.Nome</td>
+                            <td><span class="text-muted font-monospace small">@r.Codigo</span></td>
+                            <td>@r.Params</td>
+                            <td><code class="endpoint">/reports/@r.Codigo/pdf</code></td>
+                            <td class="text-end pe-3">
+                                <a class="btn btn-sm btn-outline-secondary" href="/reports/@r.Codigo/pdf" target="_blank"><i class="bi bi-eye"></i></a>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => editor.OpenAsync(r.Nome, r.Codigo, true)"><i class="bi bi-pencil"></i> Editar</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
     </div>
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr><th>Nome</th><th>Código</th><th>Params</th><th>Endpoint (PDF)</th><th class="right">Ações</th></tr>
-        </thead>
-        <tbody>
-            @foreach (var r in itens)
-            {
-                <tr>
-                    <td>@r.Nome</td>
-                    <td class="mono">@r.Codigo</td>
-                    <td>@r.Params</td>
-                    <td><code class="endpoint">/reports/@r.Codigo/pdf</code></td>
-                    <td class="right">
-                        <a class="btn sm ghost" href="/reports/@r.Codigo/pdf" target="_blank">Testar</a>
-                        <button class="btn sm" @onclick="() => editor.OpenAsync(r.Nome, r.Codigo, true)">Editar</button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
+</div>
 
 <ReportEditor @ref="editor" OnSaved="Carregar" />
 

@@ -2,25 +2,26 @@
 @inject IReportCatalog Catalog
 @inject ReportFileStore Store
 
-<div class="page-head">
-    <div>
-        <h1>Importar relatório</h1>
-        <p class="muted">Escolha um relatório do catálogo (SIGMA.REPORT) para configurar</p>
-    </div>
+<div class="mb-3">
+    <h4 class="fw-bold mb-0">Importar relatório</h4>
+    <div class="text-muted small">Escolha um relatório do catálogo (SIGMA.REPORT) para configurar</div>
 </div>
 
-<div class="toolbar">
-    <input class="in search" placeholder="🔍  Filtrar relatórios..." @bind="filtro" @bind:event="oninput" />
-    <span class="muted small">@Filtrados().Count() de @catalogo.Count</span>
+<div class="d-flex align-items-center gap-3 mb-3" style="max-width:520px">
+    <div class="input-group">
+        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+        <input class="form-control" placeholder="Filtrar relatórios..." @bind="filtro" @bind:event="oninput" />
+    </div>
+    <span class="text-muted small text-nowrap">@Filtrados().Count() de @catalogo.Count</span>
 </div>
 
 @if (carregando)
 {
-    <div class="empty">Carregando catálogo…</div>
+    <div class="text-muted">Carregando catálogo…</div>
 }
 else if (!Filtrados().Any())
 {
-    <div class="empty">
+    <div class="alert alert-light border">
         @(catalogo.Count == 0
             ? "Catálogo vazio — configure o Oracle para listar a SIGMA.REPORT."
             : "Nenhum relatório para esse filtro.")
@@ -28,16 +29,22 @@ else if (!Filtrados().Any())
 }
 else
 {
-    <div class="cards">
+    <div class="row g-3">
         @foreach (var it in Filtrados())
         {
-            <div class="report-card" @onclick="() => editor.OpenAsync(it.Name, it.Codigo, it.Imported)">
-                <div class="report-card-top">
-                    <span class="chip @(it.Imported ? "chip-ok" : "chip-muted")">@(it.Imported ? "ativo" : "novo")</span>
+            <div class="col-sm-6 col-lg-4">
+                <div class="card report-card h-100" @onclick="() => editor.OpenAsync(it.Name, it.Codigo, it.Imported)">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <i class="bi bi-file-earmark-text fs-4 text-primary"></i>
+                            @if (it.Imported) { <span class="badge text-bg-success">ativo</span> }
+                            else { <span class="badge text-bg-secondary">novo</span> }
+                        </div>
+                        <div class="fw-semibold">@it.Name</div>
+                        <div class="text-muted small font-monospace">@it.Codigo</div>
+                        <div class="text-primary small mt-2">@(it.Imported ? "Editar →" : "Configurar →")</div>
+                    </div>
                 </div>
-                <div class="report-name">@it.Name</div>
-                <div class="report-cod">@it.Codigo</div>
-                <div class="report-action">@(it.Imported ? "Editar →" : "Configurar →")</div>
             </div>
         }
     </div>

@@ -1,30 +1,43 @@
 @inherits LayoutComponentBase
 
-<div class="shell">
-    <aside class="sidebar">
-        <div class="brand">Sensatta<span>Reports</span></div>
-        <nav class="nav-list">
-            <NavLink class="nav" href="/admin" Match="NavLinkMatch.All">
-                <span class="nav-ic">▦</span> Dashboard
-            </NavLink>
-            <NavLink class="nav" href="/admin/relatorios">
-                <span class="nav-ic">▤</span> Relatórios
-            </NavLink>
-            <NavLink class="nav" href="/admin/chamadas">
-                <span class="nav-ic">↯</span> Chamadas
-            </NavLink>
-            <NavLink class="nav" href="/admin/importar">
-                <span class="nav-ic">＋</span> Importar
-            </NavLink>
-        </nav>
-        <a class="nav logout" href="/auth/logout"><span class="nav-ic">⇥</span> Sair</a>
-    </aside>
-
-    <div class="main">
-        <main class="content">
-            @Body
-        </main>
+<nav id="sidebar">
+    <div class="sidebar-brand">
+        <img src="img/logo-betterbeef.webp" alt="Better Beef" />
+        <span class="brand-sub">Sensatta Reports</span>
     </div>
+    <ul class="nav flex-column pt-2">
+        <li class="nav-item">
+            <NavLink class="nav-link" href="/admin" Match="NavLinkMatch.All"><i class="bi bi-speedometer2"></i> Dashboard</NavLink>
+        </li>
+        <li class="nav-item">
+            <NavLink class="nav-link" href="/admin/relatorios"><i class="bi bi-file-earmark-text"></i> Relatórios</NavLink>
+        </li>
+        <li class="nav-item">
+            <NavLink class="nav-link" href="/admin/chamadas"><i class="bi bi-activity"></i> Chamadas</NavLink>
+        </li>
+        <li class="nav-item">
+            <NavLink class="nav-link" href="/admin/importar"><i class="bi bi-plus-circle"></i> Importar</NavLink>
+        </li>
+        <li class="nav-item logout">
+            <a class="nav-link" href="/auth/logout"><i class="bi bi-box-arrow-right"></i> Sair</a>
+        </li>
+    </ul>
+</nav>
+
+<div id="sidebarBackdrop" onclick="closeSidebar()"></div>
+
+<div id="wrapper">
+    <nav id="topbar">
+        <button class="btn btn-sm btn-outline-secondary" onclick="toggleSidebar()" title="Menu"><i class="bi bi-list"></i></button>
+        <span class="page-title">Painel de Relatórios</span>
+        <div class="ms-auto d-flex align-items-center gap-2 small text-muted">
+            <span><i class="bi bi-person-circle"></i> admin</span>
+            <a class="btn btn-sm btn-outline-secondary" href="/auth/logout"><i class="bi bi-box-arrow-right"></i> Sair</a>
+        </div>
+    </nav>
+    <main id="main-content">
+        @Body
+    </main>
 </div>
 
 <Toasts />

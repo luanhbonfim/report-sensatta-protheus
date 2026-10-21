@@ -3,60 +3,78 @@
 @inject ReportFileStore Store
 @inject CallLogService Calls
 
-<div class="page-head">
+<div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-        <h1>Dashboard</h1>
-        <p class="muted">Visão geral do serviço de relatórios</p>
+        <h4 class="fw-bold mb-0">Dashboard</h4>
+        <div class="text-muted small">Visão geral do serviço de relatórios</div>
     </div>
-    <a class="btn primary" href="/admin/importar">＋ Importar relatório</a>
+    <a class="btn btn-primary" href="/admin/importar"><i class="bi bi-plus-circle me-1"></i>Importar relatório</a>
 </div>
 
-<div class="kpis">
-    <div class="kpi">
-        <div class="kpi-val">@Store.ListImported().Count</div>
-        <div class="kpi-lab">Relatórios ativos</div>
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="metric-card" style="background:#7f1810">
+            <div class="metric-value">@Store.ListImported().Count</div>
+            <div class="metric-label">Relatórios ativos</div>
+            <i class="bi bi-file-earmark-text metric-ic"></i>
+        </div>
     </div>
-    <div class="kpi">
-        <div class="kpi-val">@Calls.Hoje</div>
-        <div class="kpi-lab">Chamadas hoje</div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="metric-card" style="background:#0d6efd">
+            <div class="metric-value">@Calls.Hoje</div>
+            <div class="metric-label">Chamadas hoje</div>
+            <i class="bi bi-activity metric-ic"></i>
+        </div>
     </div>
-    <div class="kpi">
-        <div class="kpi-val">@Calls.Total</div>
-        <div class="kpi-lab">Chamadas no buffer</div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="metric-card" style="background:#6c757d">
+            <div class="metric-value">@Calls.Total</div>
+            <div class="metric-label">Chamadas (buffer)</div>
+            <i class="bi bi-bar-chart metric-ic"></i>
+        </div>
     </div>
-    <div class="kpi @(Calls.Erros > 0 ? "kpi-warn" : "")">
-        <div class="kpi-val">@Calls.Erros</div>
-        <div class="kpi-lab">Erros</div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="metric-card" style="background:@ErroBg()">
+            <div class="metric-value">@Calls.Erros</div>
+            <div class="metric-label">Erros</div>
+            <i class="bi bi-exclamation-triangle metric-ic"></i>
+        </div>
     </div>
 </div>
 
-<div class="section-head">
-    <h2>Últimas chamadas do Protheus</h2>
-    <a class="link" href="/admin/chamadas">Ver todas →</a>
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Últimas chamadas do Protheus</span>
+        <a class="small text-decoration-none" href="/admin/chamadas">Ver todas →</a>
+    </div>
+    <div class="card-body p-0">
+        @if (!Calls.Recent(8).Any())
+        {
+            <div class="p-4 text-center text-muted">Nenhuma chamada registrada ainda.</div>
+        }
+        else
+        {
+            <table class="table table-hover align-middle mb-0">
+                <thead><tr><th class="ps-3">Quando</th><th>Relatório</th><th>Formato</th><th>Status</th><th>Tempo</th></tr></thead>
+                <tbody>
+                    @foreach (var c in Calls.Recent(8))
+                    {
+                        <tr>
+                            <td class="ps-3">@c.When.ToString("dd/MM HH:mm:ss")</td>
+                            <td class="fw-semibold">@c.Codigo</td>
+                            <td><span class="badge text-bg-light">@c.Format</span></td>
+                            <td>
+                                @if (c.Ok) { <span class="badge text-bg-success">@c.Status</span> }
+                                else { <span class="badge text-bg-danger">@c.Status</span> }
+                            </td>
+                            <td>@(c.Ms) ms</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
 </div>
-
-@if (!Calls.Recent(8).Any())
-{
-    <div class="empty">Nenhuma chamada registrada ainda.</div>
-}
-else
-{
-    <table class="table">
-        <thead><tr><th>Quando</th><th>Relatório</th><th>Formato</th><th>Status</th><th>Tempo</th></tr></thead>
-        <tbody>
-            @foreach (var c in Calls.Recent(8))
-            {
-                <tr>
-                    <td>@c.When.ToString("dd/MM HH:mm:ss")</td>
-                    <td class="mono">@c.Codigo</td>
-                    <td>@c.Format</td>
-                    <td><span class="pill @(c.Ok ? "pill-ok" : "pill-err")">@c.Status</span></td>
-                    <td>@(c.Ms) ms</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
 
 @code {
     System.Timers.Timer? timer;
@@ -67,6 +85,8 @@ else
         timer.Elapsed += (_, _) => InvokeAsync(StateHasChanged);
         timer.Start();
     }
+
+    string ErroBg() => Calls.Erros > 0 ? "#dc3545" : "#198754";
 
     public void Dispose() => timer?.Dispose();
 }

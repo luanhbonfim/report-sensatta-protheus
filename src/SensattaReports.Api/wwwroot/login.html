@@ -4,32 +4,40 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Entrar — Sensatta Reports</title>
+  <link rel="icon" type="image/png" href="img/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
   <div class="login-wrap">
     <form class="login-card" method="post" action="/auth/login">
-      <div class="login-brand">Sensatta Reports</div>
-      <div class="login-sub">Painel de relatórios</div>
+      <div class="text-center">
+        <img src="img/logo-betterbeef.webp" alt="Better Beef">
+      </div>
+      <h6 class="text-center text-muted mb-4">Painel de Relatórios</h6>
 
-      <div id="erro" class="msg err" style="display:none; margin-bottom:12px">
-        Usuário ou senha inválidos.
+      <div id="erro" class="alert alert-danger py-2 small d-none">Usuário ou senha inválidos.</div>
+
+      <div class="mb-2">
+        <label class="form-label small fw-semibold">Usuário</label>
+        <input class="form-control" name="user" autofocus autocomplete="username" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Senha</label>
+        <input class="form-control" name="password" type="password" autocomplete="current-password" required>
       </div>
 
-      <label>Usuário</label>
-      <input class="in" name="user" autofocus autocomplete="username" required>
-
-      <label>Senha</label>
-      <input class="in" name="password" type="password" autocomplete="current-password" required>
-
       <input type="hidden" name="returnUrl" id="returnUrl">
-      <button class="btn primary" style="margin-top:16px; width:100%" type="submit">Entrar</button>
+      <button class="btn btn-primary w-100" type="submit"><i class="bi bi-box-arrow-in-right me-1"></i>Entrar</button>
     </form>
   </div>
 
   <script>
     const q = new URLSearchParams(location.search);
-    if (q.get('erro')) document.getElementById('erro').style.display = 'block';
+    if (q.get('erro')) document.getElementById('erro').classList.remove('d-none');
     document.getElementById('returnUrl').value = q.get('ReturnUrl') || '/admin';
   </script>
 </body>
