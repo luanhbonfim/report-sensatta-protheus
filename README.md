@@ -186,6 +186,31 @@ Passos para um report novo:
 
 ---
 
+## Painel (cadastro pelo navegador)
+
+Além de criar os arquivos à mão, há um **painel web** no próprio serviço, em
+**`/admin`** (ex.: `http://localhost:5080/admin`).
+
+Fluxo:
+
+1. O painel lista os reports do **catálogo** `SIGMA.REPORT` (coluna `NAME`).
+2. Você seleciona um → ele traz o template (`.rtm`, coluna `TEMPLATE`).
+3. Você **cola o SQL** e clica em **"Detectar parâmetros"** (lê os binds `:nome`).
+   Ajusta tipo/obrigatoriedade/rótulo de cada um.
+4. **Salvar** grava `reports/<codigo>/report.{sql,rtm,params.json}` no servidor —
+   o banco é tocado **só nesse momento**. A partir daí o endpoint serve dos arquivos.
+5. Botão **Testar** gera o PDF/Excel na hora com valores de parâmetro.
+
+> **Persistência (produção):** aponte `Reports:Directory` para uma pasta fora do
+> publish (ex.: `C:\ProgramData\SensattaReports\reports`), senão um deploy novo
+> sobrescreve os reports importados.
+>
+> **Segurança:** o painel escreve arquivos e lê o Oracle — **restrinja o acesso
+> a `/admin` na rede** (firewall/reverse proxy). Dá para desligá-lo com
+> `Admin:Enabled=false` no `appsettings`.
+
+---
+
 ## Deploy como serviço
 
 - **Windows Server (Windows Service):**
