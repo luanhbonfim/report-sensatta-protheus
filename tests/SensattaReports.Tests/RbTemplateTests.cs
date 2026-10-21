@@ -38,13 +38,15 @@ public class RbTemplateTests
     }
 
     [Fact]
-    public void Loader_le_o_grupo_e_a_quebra()
+    public void Loader_le_os_grupos_e_as_quebras()
     {
         var tpl = RbTemplateLoader.Load(SampleRtm());
 
-        Assert.Single(tpl.Groups);
+        // o resumo quebra por produto e, dentro dele, por lote (LOTE_EUA)
+        Assert.Equal(2, tpl.Groups.Count);
         Assert.Equal("CODIGO_PRODUTO", tpl.Groups[0].BreakField);
         Assert.NotNull(tpl.Groups[0].Header);
+        Assert.Equal("LOTE_EUA", tpl.Groups[1].BreakField);
     }
 
     [Fact]
