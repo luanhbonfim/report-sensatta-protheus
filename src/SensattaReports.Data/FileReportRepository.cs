@@ -23,8 +23,19 @@ public sealed class FileReportRepository(string baseDir) : IReportRepository
         var paramsPath = Path.Combine(dir, "report.params.json");
         var paramsJson = File.Exists(paramsPath) ? await File.ReadAllTextAsync(paramsPath, ct) : null;
 
+        // layout opcional; um JSON malformado (ex.: editado a mao) nao pode
+        // derrubar a geracao do report — cai para "sem ajustes".
+        IReadOnlyDictionary<string, ElementOverride> layout;
         var layoutPath = Path.Combine(dir, "report.layout.json");
-        var layoutJson = File.Exists(layoutPath) ? await File.ReadAllTextAsync(layoutPath, ct) : null;
+        try
+        {
+            var layoutJson = File.Exists(layoutPath) ? await File.ReadAllTextAsync(layoutPath, ct) : null;
+            layout = LayoutOverridesJson.Parse(layoutJson);
+        }
+        catch
+        {
+            layout = new Dictionary<string, ElementOverride>();
+        }
 
         return new ReportDefinition
         {
@@ -33,7 +44,7 @@ public sealed class FileReportRepository(string baseDir) : IReportRepository
             Sql = await File.ReadAllTextAsync(sqlPath, ct),
             TemplateRtm = await File.ReadAllTextAsync(rtmPath, ct),
             Parametros = ReportParametersJson.Parse(paramsJson),
-            LayoutOverrides = LayoutOverridesJson.Parse(layoutJson)
+            LayoutOverrides = layout
         };
     }
 }
