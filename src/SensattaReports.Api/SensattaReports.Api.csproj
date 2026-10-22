@@ -31,6 +31,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Nunca empacotar o appsettings.Local.json (segredos): cada ambiente tem o
+         seu, criado direto na maquina. Evita o Local.json de dev viajar no publish. -->
+    <Content Update="appsettings.Local.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Copia a pasta de reports (sql/rtm/params) para a saida, em dev e publish.
          Assim os arquivos acompanham o servico onde quer que ele rode. -->
     <Content Include="../../reports/**/*"
