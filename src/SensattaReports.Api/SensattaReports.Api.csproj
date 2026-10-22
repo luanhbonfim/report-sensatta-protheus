@@ -36,6 +36,10 @@
     <Content Include="../../reports/**/*"
              Link="reports/%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" />
+    <!-- Scripts de deploy (ex.: update-service.ps1) ao lado do .exe publicado. -->
+    <Content Include="../../deploy/*.ps1"
+             Link="%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

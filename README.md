@@ -280,13 +280,24 @@ xcopy /E /I C:\Services\SensattaReports\reports C:\ProgramData\SensattaReports\r
 
 ### 4. Instalar como Serviço do Windows
 
-Num PowerShell/CMD **como administrador** (atenção ao espaço depois de `binPath=`):
+O **próprio exe se instala**. Num PowerShell/CMD **como administrador**, na pasta
+do serviço:
 
 ```bat
-sc.exe create SensattaReports binPath= "C:\Services\SensattaReports\SensattaReports.Api.exe" start= auto
-sc.exe description SensattaReports "Servico de relatorios Sensatta -> Protheus"
-sc.exe start SensattaReports
+SensattaReports.Api.exe install
 ```
+
+Isso cria o serviço (`SensattaReports`), configura auto-start + auto-restart em
+falha, e já inicia. Outros comandos:
+
+```bat
+SensattaReports.Api.exe stop
+SensattaReports.Api.exe start
+SensattaReports.Api.exe restart
+SensattaReports.Api.exe uninstall
+```
+
+> Prefere o jeito manual? `sc.exe create SensattaReports binPath= "C:\...\SensattaReports.Api.exe" start= auto` também funciona.
 
 Testar: `http://<servidor>:5080/health` deve responder `ok`.
 
@@ -296,13 +307,23 @@ Testar: `http://<servidor>:5080/health` deve responder `ok`.
 - Ative o **JWT** (`Jwt:Secret` + `Jwt:Clients`) em produção. Para TLS, use
   IIS/nginx como proxy reverso na frente.
 
-### Atualizar (novo deploy)
+### Atualizar (novo deploy) — sem reinstalar
 
-```bat
-sc.exe stop SensattaReports
-rem copie os novos arquivos da pasta publish por cima (menos o appsettings.Local.json)
-sc.exe start SensattaReports
+O serviço fica registrado; atualizar é só **trocar os binários e reiniciar**. Use
+o `update-service.ps1` (vai junto no publish, ao lado do exe):
+
+```powershell
+# na pasta do serviço, como administrador; -Source = a nova pasta publish
+.\update-service.ps1 -Source "C:\temp\publish-nova"
 ```
+
+Ele **para** o serviço, copia a nova versão por cima (preservando o
+`appsettings.Local.json` e a pasta `reports`) e **inicia** de novo. Manual, se
+preferir: `SensattaReports.Api.exe stop` → copiar arquivos → `... start`.
+
+> **Automatizar os releases:** dá para um **GitHub Actions** compilar a publish
+> Windows a cada tag e anexar o `.zip` no release — aí atualizar vira "baixar o
+> zip + rodar o `update-service.ps1`". Posso configurar quando quiser.
 
 ### Linux (systemd), se um dia precisar
 

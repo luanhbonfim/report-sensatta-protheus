@@ -7,6 +7,14 @@ using SensattaReports.Core.Models;
 using SensattaReports.Data;
 using SensattaReports.ReportBuilder.Rendering;
 
+// Gestao do Servico do Windows pelo proprio exe (antes de subir a API):
+//   SensattaReports.Api.exe install | uninstall | start | stop | restart
+if (OperatingSystem.IsWindows() && args.Length > 0 &&
+    args[0].ToLowerInvariant() is "install" or "uninstall" or "start" or "stop" or "restart")
+{
+    Environment.Exit(ServiceInstaller.Run(args[0].ToLowerInvariant()));
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Config local (senha do Oracle etc.) que NAO vai para o Git (gitignore).
