@@ -19,12 +19,13 @@
     <div class="d-flex align-items-center gap-2 flex-wrap">
         <div class="btn-group btn-group-sm" role="group">
             <button class="btn btn-outline-secondary" @onclick="() => Zoom(-1)" disabled="@(scale <= 2.5)" title="Diminuir"><i class="bi bi-zoom-out"></i></button>
-            <span class="btn btn-outline-secondary disabled" style="min-width:58px">@(((int)Math.Round(scale / 4.5 * 100)))%</span>
+            <button class="btn btn-outline-secondary" @onclick="AjustarLargura" title="Ajustar à largura"><i class="bi bi-arrows-angle-expand"></i></button>
             <button class="btn btn-outline-secondary" @onclick="() => Zoom(1)" disabled="@(scale >= 14.0)" title="Aumentar"><i class="bi bi-zoom-in"></i></button>
         </div>
         <button class="btn btn-sm btn-light border" @onclick="Desfazer" disabled="@(historico.Count == 0)" title="Desfazer o último ajuste"><i class="bi bi-arrow-90deg-left me-1"></i>Desfazer</button>
         <button class="btn btn-sm btn-light border" @onclick="AbrirJson" title="Editar o JSON"><i class="bi bi-braces me-1"></i>JSON</button>
         <button class="btn btn-sm btn-light border text-danger" @onclick="ResetarTudo" disabled="@(overrides.Count == 0)" title="Descartar todos os ajustes"><i class="bi bi-arrow-counterclockwise"></i></button>
+        <button class="btn btn-sm btn-outline-primary" @onclick="AbrirPreview"><i class="bi bi-eye me-1"></i>Pré-visualizar</button>
         <button class="btn btn-sm btn-primary" @onclick="Salvar"><i class="bi bi-save me-1"></i>Salvar</button>
     </div>
 </div>
@@ -125,24 +126,22 @@ else
                     }
                 </div>
             </div>
-
-            <button class="btn btn-outline-primary w-100 mt-3" @onclick="TogglePreview">
-                <i class="bi bi-eye me-1"></i>@(mostrarPreview ? "Ocultar" : "Mostrar") pré-visualização
-            </button>
         </aside>
     </div>
+}
 
-    @if (mostrarPreview)
-    {
-        <div class="card preview-card">
-            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <span><i class="bi bi-file-earmark-pdf me-1"></i>Pré-visualização</span>
-                <div class="d-flex align-items-end gap-2 flex-wrap">
+@if (previewAberto)
+{
+    <div class="preview-overlay" @onclick="FecharPreview">
+        <div class="preview-dialog" @onclick="() => {}" @onclick:stopPropagation="true">
+            <div class="preview-dialog-head">
+                <span class="fw-semibold"><i class="bi bi-file-earmark-pdf me-1"></i>Pré-visualização — @(nome ?? codigo)</span>
+                <div class="d-flex align-items-end gap-2 flex-wrap ms-auto">
                     @foreach (var p in parametros)
                     {
                         <div>
                             <label class="form-label small text-muted mb-0 d-block lh-1">@p</label>
-                            <input class="form-control form-control-sm" style="width:150px" placeholder="@p"
+                            <input class="form-control form-control-sm" style="width:140px" placeholder="@p"
                                    @bind:get="GetTeste(p)" @bind:set="v => SetTeste(p, v)" />
                         </div>
                     }
@@ -151,23 +150,24 @@ else
                     {
                         <a class="btn btn-sm btn-outline-secondary" href="@previewUrl" target="_blank" title="Abrir em nova aba"><i class="bi bi-box-arrow-up-right"></i></a>
                     }
+                    <button class="btn btn-sm btn-light border" @onclick="FecharPreview" title="Fechar"><i class="bi bi-x-lg"></i></button>
                 </div>
             </div>
-            <div class="card-body p-0">
+            <div class="preview-dialog-body">
                 @if (previewUrl is not null)
                 {
                     <iframe src="@previewUrl" class="preview-frame"></iframe>
                 }
                 else
                 {
-                    <div class="text-muted small text-center p-5">
+                    <div class="text-muted text-center p-5">
                         Preencha os valores e clique em <b>Gerar</b>.
-                        <div class="mt-1">O preview mostra o que está <b>salvo</b> — salve os ajustes antes.</div>
+                        <div class="small mt-1">O preview mostra o que está <b>salvo</b> — salve os ajustes antes.</div>
                     </div>
                 }
             </div>
         </div>
-    }
+    </div>
 }
 
 <Modal @bind-Visible="jsonVisible" Title="JSON do layout (report.layout.json)">
@@ -211,8 +211,14 @@ else
     .rp-field.rp-dragging { cursor:grabbing; opacity:.85; z-index:12; }
     .rp-field-txt { pointer-events:none; }
     .prop-card { border:1px solid #e5e7eb; box-shadow:0 1px 3px rgba(0,0,0,.05); }
-    .preview-card { margin-top:16px; border:1px solid #e5e7eb; }
-    .preview-frame { width:100%; height:78vh; border:0; display:block; }
+    .preview-overlay { position:fixed; inset:0; z-index:1080; background:rgba(15,23,42,.55);
+                       display:flex; align-items:center; justify-content:center; padding:2.5vh 2vw; }
+    .preview-dialog { background:#fff; border-radius:.7rem; width:94vw; max-width:1100px; height:95vh;
+                      display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.4); }
+    .preview-dialog-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:10px 16px;
+                           border-bottom:1px solid #e5e7eb; background:#f8f9fa; }
+    .preview-dialog-body { flex:1; min-height:0; background:#525659; }
+    .preview-frame { width:100%; height:100%; border:0; display:block; }
 </style>
 
 @code {
@@ -225,7 +231,7 @@ else
     string? erro;
     string? selecionado;
     string? previewUrl;
-    bool mostrarPreview;
+    bool previewAberto;
 
     readonly Dictionary<string, ElementOverride> overrides = new(StringComparer.OrdinalIgnoreCase);
     readonly Stack<Dictionary<string, ElementOverride>> historico = new(); // p/ desfazer
@@ -261,14 +267,27 @@ else
             try
             {
                 // ?v= evita o navegador usar uma versão antiga do módulo em cache
-                module = await JS.InvokeAsync<IJSObjectReference>("import", "./layout-editor.js?v=3");
+                module = await JS.InvokeAsync<IJSObjectReference>("import", "./layout-editor.js?v=4");
                 selfRef = DotNetObjectReference.Create(this);
                 await module.InvokeVoidAsync("enableDrag", canvas, selfRef);
+                await AjustarLargura(); // zoom inicial = cabe na largura (sem scroll lateral)
             }
             catch
             {
                 // sem o arrastar o editor ainda funciona pelos campos numéricos
             }
+        }
+    }
+
+    async Task AjustarLargura()
+    {
+        if (module is null || tpl is null) return;
+        var w = await module.InvokeAsync<double>("clientWidth", canvas);
+        if (w > 80)
+        {
+            // desconta padding do canvas + margem/bordas da banda, p/ não sobrar scroll lateral
+            scale = Math.Clamp((w - 56) / tpl.ContentWidthMm, 2.5, 14.0);
+            StateHasChanged();
         }
     }
 
@@ -283,7 +302,8 @@ else
 
     void Zoom(double delta) => scale = Math.Clamp(scale + delta, 2.5, 14.0);
 
-    void TogglePreview() => mostrarPreview = !mostrarPreview;
+    void AbrirPreview() => previewAberto = true;
+    void FecharPreview() => previewAberto = false;
 
     // ---- desfazer ----
     void Snapshot() => historico.Push(new Dictionary<string, ElementOverride>(overrides, StringComparer.OrdinalIgnoreCase));
@@ -433,7 +453,7 @@ else
 
     void AtualizarPreview()
     {
-        mostrarPreview = true;
+        previewAberto = true;
         var qs = string.Join("&", parametros
             .Where(n => !string.IsNullOrWhiteSpace(GetTeste(n)))
             .Select(n => Uri.EscapeDataString(n) + "=" + Uri.EscapeDataString(GetTeste(n))));

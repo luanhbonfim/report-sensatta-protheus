@@ -1,6 +1,9 @@
 // Arrastar campos no editor de layout. O movimento e feito no cliente (suave);
 // no "soltar" so a posicao final em PIXELS volta ao Blazor, que converte para
 // mm usando o zoom atual (assim o zoom nao precisa falar com o JS).
+// largura util (interna) de um elemento, para o editor ajustar o zoom ao abrir
+export function clientWidth(el) { return el ? el.clientWidth : 0; }
+
 export function enableDrag(container, dotnet) {
     let drag = null;
 
