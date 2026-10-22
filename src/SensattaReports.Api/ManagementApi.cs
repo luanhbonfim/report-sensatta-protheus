@@ -8,10 +8,10 @@ using SensattaReports.ReportBuilder.Model;
 namespace SensattaReports.Api;
 
 /// <summary>
-/// API HTTP de gerenciamento (JSON), consumida por um painel externo.
-/// Cobre o que o painel Blazor fazia em processo: catalogo, CRUD de reports,
-/// layout (para o editor visual) e log de chamadas. Protegida por X-Api-Key.
-/// As rotas de geracao (/reports/{cod}/pdf|xlsx) continuam no Program.cs.
+/// API HTTP de gerenciamento (JSON), consumida pelo painel externo:
+/// catalogo, CRUD de reports, layout (para o editor visual) e log de chamadas.
+/// Protegida por JWT (role admin) quando o JWT esta habilitado.
+/// As rotas de geracao (/reports/{cod}/pdf|xlsx) ficam no Program.cs.
 /// </summary>
 public static class ManagementApi
 {

@@ -1,11 +1,10 @@
 # Handoff — Painel do Sensatta Reports (para o Report Server)
 
-> **Para quem é este documento:** o agente/dev que vai **reconstruir o painel** de
-> relatórios dentro do outro sistema (o "Report Server"). O painel que existe hoje
-> neste repositório (Blazor Server, em `/admin`) é só uma **referência**; a UI vai
-> migrar para o seu sistema. **O backend não migra** — este serviço continua sendo
-> a API + serviço Windows que gera os PDFs/Excel e guarda as definições dos
-> relatórios. Você consome esta API por HTTP.
+> **Para quem é este documento:** o agente/dev que vai **construir o painel** de
+> relatórios dentro do outro sistema (o "Report Server"). Este serviço é **headless**
+> (só API) — não há mais painel aqui; a UI é toda sua. **O backend não migra** — este
+> serviço é a API + serviço Windows que gera os PDFs/Excel e guarda as definições
+> dos relatórios. Você consome esta API por HTTP (contrato abaixo).
 
 ---
 
@@ -398,13 +397,13 @@ O painel **não** mexe em arquivos diretamente — faz tudo pela API `/api/*`.
 - **Segurança**: tudo usa **JWT Bearer** (seção 2). `/reports/*` aceita qualquer
   token válido (role `reports` ou `admin`); `/api/*` exige role `admin`. Em dev,
   sem `Jwt:Secret`, fica aberto.
-- **Migração**: enquanto o painel novo não entra, o painel Blazor em `/admin` segue
-  funcionando como referência. Quando o seu painel assumir, o Blazor (e a auth por
-  cookie) pode ser removido do serviço para ele virar 100% headless.
+- **Headless**: o painel Blazor que existia neste repositório foi **removido** — a
+  UI é toda do seu sistema. O serviço expõe só as APIs.
 
-Dúvidas sobre qualquer endpoint ou comportamento: o código de referência está em
-`src/SensattaReports.Api/ManagementApi.cs` (API) e
-`src/SensattaReports.Api/Components/Pages/LayoutEditor.razor` (editor).
+Dúvidas sobre qualquer endpoint ou comportamento: o código de referência da API
+está em `src/SensattaReports.Api/ManagementApi.cs` e `Auth.cs`. A especificação do
+editor de layout está na seção 6 acima (o editor visual de referência foi removido
+junto com o painel, mas a seção 6 descreve todo o comportamento a reproduzir).
 
 ---
 

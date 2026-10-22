@@ -30,7 +30,7 @@ public static class Auth
     public static bool IsEnabled(IConfiguration cfg)
         => !string.IsNullOrWhiteSpace(cfg["Jwt:Secret"]);
 
-    /// <summary>Configura o esquema JWT Bearer (alem do cookie do painel Blazor).</summary>
+    /// <summary>Configura o esquema JWT Bearer.</summary>
     public static void AddReportsJwt(this AuthenticationBuilder builder, IConfiguration cfg)
     {
         var secret = cfg["Jwt:Secret"]!; // so chamado quando IsEnabled

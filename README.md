@@ -125,10 +125,15 @@ conecta no Oracle 11g **sem** precisar instalar Oracle Client.
 
 | Método | Rota | Retorno |
 |---|---|---|
-| `GET` | `/health` | status do serviço |
+| `GET` | `/health` | status do serviço (público) |
+| `POST` | `/auth/token` | emite o token JWT (público) |
 | `GET` | `/reports/{codigo}/pdf?param=valor` | PDF |
 | `GET` | `/reports/{codigo}/xlsx?param=valor` | XLSX |
 | `POST` | `/reports/{codigo}` | PDF/XLSX (corpo JSON) |
+
+As rotas de **gerenciamento** `/api/*` (catálogo, CRUD de reports, layout, log)
+são consumidas pelo painel externo — ver **[`docs/HANDOFF-PAINEL.md`](docs/HANDOFF-PAINEL.md)**.
+Com JWT ligado, as chamadas levam `Authorization: Bearer <token>`.
 
 Corpo do POST:
 
@@ -186,39 +191,18 @@ Passos para um report novo:
 
 ---
 
-## Painel (cadastro pelo navegador)
+## API de gerenciamento + autenticação
 
-Além de criar os arquivos à mão, há um **painel web** no próprio serviço, em
-**`/admin`** (ex.: `http://localhost:5080/admin`).
+Este serviço é **headless** (só API) — o painel vive em outro sistema (o *Report
+Server*) e consome a API de gerenciamento `/api/*` (catálogo, CRUD de reports,
+layout para o editor visual, log de chamadas). O contrato completo e a
+especificação das telas estão em **[`docs/HANDOFF-PAINEL.md`](docs/HANDOFF-PAINEL.md)**.
 
-Fluxo:
-
-1. O painel lista os reports do **catálogo** `SIGMA.REPORT` (coluna `NAME`).
-2. Você seleciona um → ele traz o template (`.rtm`, coluna `TEMPLATE`).
-3. Você **cola o SQL** e clica em **"Detectar parâmetros"** (lê os binds `:nome`).
-   Ajusta tipo/obrigatoriedade/rótulo de cada um.
-4. **Salvar** grava `reports/<codigo>/report.{sql,rtm,params.json}` no servidor —
-   o banco é tocado **só nesse momento**. A partir daí o endpoint serve dos arquivos.
-5. Botão **Testar** gera o PDF/Excel na hora com valores de parâmetro.
-
-> **Persistência (produção):** aponte `Reports:Directory` para uma pasta fora do
-> publish (ex.: `C:\ProgramData\SensattaReports\reports`), senão um deploy novo
-> sobrescreve os reports importados.
->
-### Login do painel
-
-O `/admin` exige **login** (cookie). As credenciais ficam na configuração:
-
-- `Admin:User` (padrão `admin`, em `appsettings.json`)
-- `Admin:Password` — **defina no `appsettings.Local.json` ou na variável
-  `Admin__Password`**. Sem ela, a senha padrão é `admin` (troque!).
-
-O endpoint `/reports/...` (que o Protheus chama) **não** exige login — a proteção
-é só do painel.
-
-> **Segurança:** além do login, o painel escreve arquivos e lê o Oracle —
-> **restrinja o acesso a `/admin` na rede** (firewall/reverse proxy). Dá para
-> desligá-lo por completo com `Admin:Enabled=false` no `appsettings`.
+**Autenticação (JWT Bearer):** tudo (`/reports/*` e `/api/*`) usa token. O
+consumidor pega o token em `POST /auth/token` (clientId+clientSecret de
+`Jwt:Clients`) e manda `Authorization: Bearer <token>`. `/reports/*` aceita
+qualquer role; `/api/*` exige role `admin`. **Sem `Jwt:Secret` configurado, a
+auth fica desligada (dev).** Detalhes no handoff e em `src/SensattaReports.Api/Auth.cs`.
 
 ---
 
@@ -248,7 +232,14 @@ Crie `C:\Services\SensattaReports\appsettings.Local.json` (não vai para o Git):
 {
   "Data": { "Source": "Oracle" },
   "Oracle": { "ConnectionString": "User Id=...;Password=...;Data Source=HOST:1521/SERVICO;" },
-  "Admin": { "User": "admin", "Password": "uma-senha-forte" },
+  "Jwt": {
+    "Secret": "um-segredo-forte-32+-chars",
+    "Clients": [
+      { "Id": "protheus", "Secret": "...", "Role": "reports" },
+      { "Id": "painel",   "Secret": "...", "Role": "admin" }
+    ]
+  },
+  "Cors": { "Origins": [ "https://painel.betterbeef.com.br" ] },
   "Reports": { "Directory": "C:\\ProgramData\\SensattaReports\\reports" }
 }
 ```
@@ -260,7 +251,7 @@ mkdir C:\ProgramData\SensattaReports\reports
 xcopy /E /I C:\Services\SensattaReports\reports C:\ProgramData\SensattaReports\reports
 ```
 
-(Assim os reports importados pelo painel sobrevivem a um deploy novo.)
+(Assim os reports importados pela API sobrevivem a um deploy novo.)
 
 ### 4. Instalar como Serviço do Windows
 
@@ -276,8 +267,8 @@ Testar: `http://<servidor>:5080/health` deve responder `ok`.
 
 ### 5. Firewall e rede
 
-- Libere a porta **5080** para o servidor do Protheus alcançar o serviço.
-- **Restrinja `/admin`** à rede interna (firewall/reverse proxy). Para TLS, use
+- Libere a porta **5080** para o Protheus e o painel alcançarem o serviço.
+- Ative o **JWT** (`Jwt:Secret` + `Jwt:Clients`) em produção. Para TLS, use
   IIS/nginx como proxy reverso na frente.
 
 ### Atualizar (novo deploy)
