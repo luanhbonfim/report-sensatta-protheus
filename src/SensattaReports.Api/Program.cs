@@ -104,17 +104,17 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok", time = DateTime.UtcN
 // Download direto (GET) — pratico para o Protheus via FWRest/HttpGet.
 // Ex.: /reports/resumo-coletas-eua/pdf?data_ini=2026-10-01&data_fim=2026-10-31
 app.MapGet("/reports/{codigo}/pdf", (string codigo, HttpContext ctx, ReportService svc, CallLogService log, CancellationToken ct)
-    => Generate(codigo, ReportFormat.Pdf, QueryParams(ctx), svc, log, ct));
+    => Generate(codigo, ReportFormat.Pdf, QueryParams(ctx), ctx, svc, log, ct));
 
 app.MapGet("/reports/{codigo}/xlsx", (string codigo, HttpContext ctx, ReportService svc, CallLogService log, CancellationToken ct)
-    => Generate(codigo, ReportFormat.Xlsx, QueryParams(ctx), svc, log, ct));
+    => Generate(codigo, ReportFormat.Xlsx, QueryParams(ctx), ctx, svc, log, ct));
 
 // Alternativa por POST com corpo JSON: { "format": "pdf", "parametros": { "data_ini": "..." } }
-app.MapPost("/reports/{codigo}", async (string codigo, GerarDto body, ReportService svc, CallLogService log, CancellationToken ct) =>
+app.MapPost("/reports/{codigo}", async (string codigo, GerarDto body, HttpContext ctx, ReportService svc, CallLogService log, CancellationToken ct) =>
 {
     var fmt = string.Equals(body.Format, "xlsx", StringComparison.OrdinalIgnoreCase)
         ? ReportFormat.Xlsx : ReportFormat.Pdf;
-    return await Generate(codigo, fmt, body.Parametros ?? new(), svc, log, ct);
+    return await Generate(codigo, fmt, body.Parametros ?? new(), ctx, svc, log, ct);
 });
 
 // ---------------------------------------------------------------------------
@@ -171,7 +171,7 @@ static Dictionary<string, string?> QueryParams(HttpContext ctx)
         StringComparer.OrdinalIgnoreCase);
 
 static async Task<IResult> Generate(string codigo, ReportFormat fmt,
-    IReadOnlyDictionary<string, string?> parametros, ReportService svc, CallLogService log, CancellationToken ct)
+    IReadOnlyDictionary<string, string?> parametros, HttpContext ctx, ReportService svc, CallLogService log, CancellationToken ct)
 {
     var sw = Stopwatch.StartNew();
     var query = string.Join("&", parametros
@@ -186,6 +186,13 @@ static async Task<IResult> Generate(string codigo, ReportFormat fmt,
         var req = new ReportRequest { Codigo = codigo, Format = fmt, Parametros = parametros };
         var output = await svc.GenerateAsync(req, ct);
         Reg(true, 200, null);
+        // PDF: inline (abre no navegador e funciona na pré-visualização em iframe);
+        // Excel: baixa como arquivo.
+        if (fmt == ReportFormat.Pdf)
+        {
+            ctx.Response.Headers.ContentDisposition = $"inline; filename=\"{output.FileName}\"";
+            return Results.File(output.Content, output.ContentType);
+        }
         return Results.File(output.Content, output.ContentType, output.FileName);
     }
     catch (ReportNotFoundException e)

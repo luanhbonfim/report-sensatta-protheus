@@ -1,6 +1,11 @@
 // Arrastar campos no editor de layout. O movimento e feito no cliente (suave);
 // so a posicao final (em mm) e enviada ao Blazor no "soltar".
+let currentScale = 3.0;
+
+export function setScale(s) { currentScale = s; }
+
 export function enableDrag(container, dotnet, scale) {
+    currentScale = scale;
     let drag = null;
 
     container.addEventListener('pointerdown', e => {
@@ -33,8 +38,8 @@ export function enableDrag(container, dotnet, scale) {
         if (!drag) return;
         const f = drag.field;
         const name = f.getAttribute('data-name');
-        const leftMm = (parseFloat(f.style.left) || 0) / scale;
-        const topMm = (parseFloat(f.style.top) || 0) / scale;
+        const leftMm = (parseFloat(f.style.left) || 0) / currentScale;
+        const topMm = (parseFloat(f.style.top) || 0) / currentScale;
         f.classList.remove('rp-dragging');
         drag = null;
         dotnet.invokeMethodAsync('OnFieldMoved', name, leftMm, topMm);

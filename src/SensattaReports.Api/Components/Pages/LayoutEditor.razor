@@ -42,6 +42,12 @@ else
 {
     <div class="row g-3">
         <div class="col-lg-8">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="text-muted small">Zoom</span>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => Zoom(-1)" disabled="@(scale <= 2.0)"><i class="bi bi-dash-lg"></i></button>
+                <span class="small fw-semibold" style="min-width:42px;text-align:center">@((scale / 3.0).ToString("0.0"))×</span>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => Zoom(1)" disabled="@(scale >= 12.0)"><i class="bi bi-plus-lg"></i></button>
+            </div>
             <div class="layout-canvas" @ref="canvas">
                 @foreach (var sec in Secoes())
                 {
@@ -154,8 +160,8 @@ else
     .layout-canvas { overflow:auto; background:#fff; border:1px solid #dee2e6; border-radius:.5rem; padding:12px; }
     .band-label { font-size:.72rem; font-weight:600; color:#6b0d0d; margin:10px 0 2px; }
     .band { position:relative; background:#fbfbfb; border:1px dashed #cdd3da; }
-    .rp-field { position:absolute; box-sizing:border-box; border:1px solid #9bb3d4; background:rgba(13,110,253,.06);
-                font-size:9px; line-height:1; overflow:hidden; cursor:grab; user-select:none; padding:1px 2px; white-space:nowrap; }
+    .rp-field { position:absolute; box-sizing:border-box; border:1px solid #9bb3d4; background:rgba(13,110,253,.08);
+                font-size:11px; line-height:1.05; overflow:hidden; cursor:grab; user-select:none; padding:1px 3px; white-space:nowrap; }
     .rp-field:hover { border-color:#0d6efd; background:rgba(13,110,253,.14); }
     .rp-field.sel { border-color:#d20a11; background:rgba(210,10,17,.12); box-shadow:0 0 0 2px rgba(210,10,17,.25); z-index:5; }
     .rp-field.is-line { background:#adb5bd; border:none; }
@@ -168,7 +174,7 @@ else
 @code {
     [Parameter] public string codigo { get; set; } = "";
 
-    const double Scale = 3.0; // px por mm
+    double scale = 4.5; // px por mm (ajustável pelo zoom)
 
     RbTemplate? tpl;
     string? nome;
@@ -209,7 +215,7 @@ else
         {
             module = await JS.InvokeAsync<IJSObjectReference>("import", "./layout-editor.js");
             selfRef = DotNetObjectReference.Create(this);
-            await module.InvokeVoidAsync("enableDrag", canvas, selfRef, Scale);
+            await module.InvokeVoidAsync("enableDrag", canvas, selfRef, scale);
         }
     }
 
@@ -356,7 +362,8 @@ else
         try
         {
             await Store.SaveLayoutAsync(codigo, overrides);
-            Toasts.Success("Layout salvo! Gere o preview para conferir.");
+            if (previewUrl is not null) AtualizarPreview(); // reflete o que acabou de salvar
+            Toasts.Success("Layout salvo!");
         }
         catch (Exception ex)
         {
@@ -377,9 +384,15 @@ else
         previewUrl = baseUrl + sep + "v=" + DateTime.Now.Ticks; // cache-buster
     }
 
+    async Task Zoom(double delta)
+    {
+        scale = Math.Clamp(scale + delta, 2.0, 12.0);
+        if (module is not null) await module.InvokeVoidAsync("setScale", scale);
+    }
+
     static double Round(double v) => Math.Round(v, 2);
     static string F(double mm) => mm.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-    static string Px(double mm) => (mm * Scale).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+    string Px(double mm) => (mm * scale).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
 
     public async ValueTask DisposeAsync()
     {
