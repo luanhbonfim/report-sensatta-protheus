@@ -83,25 +83,40 @@ token na **query string** das rotas **GET** de geração:
   browser, me avise que habilito CORS por origem.
 
 Respostas são **JSON em camelCase**. Erros vêm como `{ "error": "mensagem" }` com o
-status HTTP adequado (400/401/404/500).
+status HTTP adequado (400/401/404/500). Token ausente/inválido/expirado → **401**.
+
+### Exemplo fim-a-fim (painel)
+```bash
+# 1) pega o token (o backend do painel faz isso)
+TOKEN=$(curl -s -X POST http://localhost:5080/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"clientId":"painel","clientSecret":"<segredo>"}' | jq -r .access_token)
+
+# 2) usa em cada chamada
+curl http://localhost:5080/api/reports -H "Authorization: Bearer $TOKEN"
+```
 
 ---
 
-## 3. Endpoints de GERAÇÃO (`/reports`) — não mudam
+## 3. Endpoints de GERAÇÃO (`/reports`)
 
-Usados pelo Protheus e pelo preview do painel.
+Usados pelo Protheus e pelo preview do painel. **Exigem token** (`Authorization:
+Bearer <token>`), ou `?access_token=` no caso do iframe (seção 2).
 
 ### PDF (inline — abre/renderiza no navegador)
 ```
 GET /reports/{codigo}/pdf?paramA=valor&paramB=valor
+Authorization: Bearer <token>
 ```
 ### Excel (download)
 ```
 GET /reports/{codigo}/xlsx?paramA=valor&paramB=valor
+Authorization: Bearer <token>
 ```
 ### POST (alternativa com corpo JSON)
 ```
 POST /reports/{codigo}
+Authorization: Bearer <token>
 Content-Type: application/json
 { "format": "pdf", "parametros": { "romaneio_inicial": "22467778", "romaneio_final": "22467778" } }
 ```
@@ -112,8 +127,8 @@ Content-Type: application/json
 - Resposta: o arquivo (PDF `Content-Type: application/pdf` inline; XLSX como
   download). Erros: 404 (código inexistente), 400 (parâmetro inválido/ausente),
   500 (erro de SQL/render — o corpo traz o detalhe).
-- **No painel, o preview do PDF** é só um `<iframe src="/reports/{codigo}/pdf?...">`
-  (funciona porque o PDF é servido *inline*).
+- **No painel, o preview do PDF** é um `<iframe src="/reports/{codigo}/pdf?...&access_token=<token>">`
+  (funciona porque o PDF é servido *inline*; o `access_token` autentica o iframe).
 
 ---
 
