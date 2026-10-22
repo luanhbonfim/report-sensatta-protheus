@@ -67,6 +67,29 @@ curl -o resumo.xlsx "http://localhost:5080/reports/resumo-coletas-eua/xlsx?data_
 
 Abra o `resumo.pdf` — deve sair com cabeçalho, barra de grupo por produto e as linhas.
 
+### Interruptor dev ↔ produção (`run.sh`)
+
+Para testar os **dois ambientes** na máquina de dev, use o `run.sh` (o "liga/desliga"):
+
+```bash
+./run.sh dev     # ASPNETCORE_ENVIRONMENT=Development  (appsettings.json + Local.json)
+./run.sh prod    # ASPNETCORE_ENVIRONMENT=Production   (+ appsettings.Production.json)
+```
+
+O que muda entre eles vem dos arquivos de config:
+
+| | Carrega | Uso |
+|---|---|---|
+| **dev** | `appsettings.json` + `appsettings.Local.json` | desenvolvimento local |
+| **prod** | ` + appsettings.Production.json` | simular o servidor aqui |
+
+> **No servidor não se usa o `run.sh`**: lá o serviço roda como **Serviço do
+> Windows**, que já sobe como **Production** por padrão (não precisa setar o
+> ambiente). Ver a seção *Deploy como serviço* abaixo.
+>
+> Em ambos, os **segredos** (Oracle, `Jwt`) vêm do `appsettings.Local.json`
+> (gitignore) ou de variáveis de ambiente — nunca do Git.
+
 ### Testes
 
 ```bash
