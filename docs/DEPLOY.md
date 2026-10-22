@@ -108,7 +108,14 @@ cd C:\Services\SensattaReports
 SensattaReports.Api.exe install
 ```
 
-Cria o serviço `SensattaReports` (auto-start + auto-restart em falha) e inicia.
+Cria o serviço `SensattaReports` (auto-start + auto-restart em falha), **trava a
+permissão do `appsettings.Local.json`** (só SYSTEM + Administradores leem) e inicia.
+
+> Por isso o `appsettings.Local.json` (passo 3) deve existir **antes** do `install`.
+> Se mexer no arquivo depois, rode de novo para re-travar:
+> ```powershell
+> icacls "C:\Services\SensattaReports\appsettings.Local.json" /inheritance:r /grant:r *S-1-5-18:R *S-1-5-32-544:F
+> ```
 
 Controles:
 ```bat

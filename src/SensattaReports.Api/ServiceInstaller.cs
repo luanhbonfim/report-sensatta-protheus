@@ -28,6 +28,7 @@ public static class ServiceInstaller
                 Sc($"description {ServiceName} \"Servico de relatorios Sensatta -> Protheus\"");
                 // auto-reinicia em caso de falha (3 tentativas, 5s cada)
                 Sc($"failure {ServiceName} reset= 86400 actions= restart/5000/restart/5000/restart/5000");
+                LockSecrets();
                 Console.WriteLine($"Servico '{ServiceName}' instalado. Iniciando...");
                 return Sc($"start {ServiceName}");
 
@@ -53,9 +54,25 @@ public static class ServiceInstaller
         }
     }
 
-    private static int Sc(string args)
+    /// <summary>
+    /// Trava a permissao do appsettings.Local.json (segredos): so SYSTEM (a conta
+    /// do servico) e o grupo Administradores podem ler. Usa SIDs conhecidos para
+    /// funcionar em Windows de qualquer idioma (*S-1-5-18 = SYSTEM,
+    /// *S-1-5-32-544 = Administradores).
+    /// </summary>
+    private static void LockSecrets()
     {
-        using var p = Process.Start(new ProcessStartInfo("sc.exe", args) { UseShellExecute = false });
+        var local = Path.Combine(AppContext.BaseDirectory, "appsettings.Local.json");
+        if (!File.Exists(local)) return;
+        Exec("icacls", $"\"{local}\" /inheritance:r /grant:r *S-1-5-18:R *S-1-5-32-544:F");
+        Console.WriteLine("Permissao do appsettings.Local.json travada (SYSTEM + Administradores).");
+    }
+
+    private static int Sc(string args) => Exec("sc.exe", args);
+
+    private static int Exec(string file, string args)
+    {
+        using var p = Process.Start(new ProcessStartInfo(file, args) { UseShellExecute = false });
         p!.WaitForExit();
         return p.ExitCode;
     }
