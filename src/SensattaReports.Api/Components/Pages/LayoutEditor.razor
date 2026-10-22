@@ -7,22 +7,171 @@
 @using Microsoft.JSInterop
 @using SensattaReports.ReportBuilder.Model
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-        <h4 class="fw-bold mb-0">Editar layout</h4>
-        <div class="text-muted small">@(nome ?? codigo) · arraste os campos para reposicionar</div>
+<div class="editor-toolbar">
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-sm btn-light border" href="/admin/relatorios" title="Voltar à lista"><i class="bi bi-arrow-left"></i></a>
+        <div>
+            <div class="fw-bold lh-1">Editar layout</div>
+            <div class="text-muted small lh-1">@(nome ?? codigo)</div>
+        </div>
     </div>
-    <div class="d-flex gap-2">
-        <a class="btn btn-outline-secondary" href="/admin/relatorios"><i class="bi bi-arrow-left me-1"></i>Voltar</a>
-        <button class="btn btn-outline-secondary" @onclick="Desfazer" disabled="@(historico.Count == 0)" title="Desfazer o último ajuste"><i class="bi bi-arrow-90deg-left me-1"></i>Desfazer</button>
-        <button class="btn btn-outline-secondary" @onclick="AbrirJson"><i class="bi bi-braces me-1"></i>JSON</button>
-        <button class="btn btn-outline-danger" @onclick="ResetarTudo" disabled="@(overrides.Count == 0)"><i class="bi bi-arrow-counterclockwise me-1"></i>Desfazer tudo</button>
-        <button class="btn btn-primary" @onclick="Salvar"><i class="bi bi-save me-1"></i>Salvar layout</button>
+
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="btn-group btn-group-sm" role="group">
+            <button class="btn btn-outline-secondary" @onclick="() => Zoom(-1)" disabled="@(scale <= 2.5)" title="Diminuir"><i class="bi bi-zoom-out"></i></button>
+            <span class="btn btn-outline-secondary disabled" style="min-width:58px">@(((int)Math.Round(scale / 4.5 * 100)))%</span>
+            <button class="btn btn-outline-secondary" @onclick="() => Zoom(1)" disabled="@(scale >= 14.0)" title="Aumentar"><i class="bi bi-zoom-in"></i></button>
+        </div>
+        <button class="btn btn-sm btn-light border" @onclick="Desfazer" disabled="@(historico.Count == 0)" title="Desfazer o último ajuste"><i class="bi bi-arrow-90deg-left me-1"></i>Desfazer</button>
+        <button class="btn btn-sm btn-light border" @onclick="AbrirJson" title="Editar o JSON"><i class="bi bi-braces me-1"></i>JSON</button>
+        <button class="btn btn-sm btn-light border text-danger" @onclick="ResetarTudo" disabled="@(overrides.Count == 0)" title="Descartar todos os ajustes"><i class="bi bi-arrow-counterclockwise"></i></button>
+        <button class="btn btn-sm btn-primary" @onclick="Salvar"><i class="bi bi-save me-1"></i>Salvar</button>
     </div>
 </div>
 
+@if (tpl is null)
+{
+    <div class="alert alert-light border m-3">@(erro ?? "Carregando…")</div>
+}
+else
+{
+    <div class="editor-grid">
+        <div class="editor-main">
+            <div class="layout-canvas" @ref="canvas">
+                @foreach (var sec in Secoes())
+                {
+                    <div class="band-card">
+                        <div class="band-head">@sec.Label <span class="band-dim">@F(sec.Band.HeightMm)&nbsp;mm</span></div>
+                        <div class="band" style="width:@Px(tpl.ContentWidthMm)px; height:@Px(Math.Max(sec.Band.HeightMm, 6))px;">
+                            @foreach (var el in sec.Band.Elements)
+                            {
+                                var b = Eff(el);
+                                <div class="rp-field @(el is RbLine ? "is-line" : "") @(b.Hidden ? "is-hidden" : "") @(el.Name == selecionado ? "sel" : "")"
+                                     data-name="@el.Name"
+                                     style="left:@Px(b.Left)px; top:@Px(b.Top)px; width:@Px(Math.Max(b.Width,2))px; height:@Px(Math.Max(b.Height,2))px;"
+                                     title="@el.Name"
+                                     @onclick="() => Selecionar(el.Name)">
+                                    <span class="rp-field-txt">@Rotulo(el)</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="text-muted small mt-2 px-1">
+                <i class="bi bi-hand-index me-1"></i>Arraste um campo para mover · clique para selecionar e ajustar à direita.
+            </div>
+        </div>
+
+        <aside class="editor-side">
+            <div class="card prop-card">
+                <div class="card-header py-2"><i class="bi bi-sliders me-1"></i>Campo selecionado</div>
+                <div class="card-body">
+                    @if (sel is not { } s)
+                    {
+                        <div class="text-muted small text-center py-4">
+                            <i class="bi bi-cursor d-block fs-4 mb-2 opacity-50"></i>
+                            Clique num campo no layout para ajustá-lo.
+                        </div>
+                    }
+                    else
+                    {
+                        var b = Eff(s);
+                        <div class="fw-semibold">@Rotulo(s)</div>
+                        <div class="text-muted small font-monospace mb-3">@s.Name</div>
+
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small text-muted mb-0">Esquerda</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" step="0.5" class="form-control" value="@F(b.Left)" @onchange="e => SetPos(e, 'L')" />
+                                    <span class="input-group-text">mm</span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small text-muted mb-0">Topo</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" step="0.5" class="form-control" value="@F(b.Top)" @onchange="e => SetPos(e, 'T')" />
+                                    <span class="input-group-text">mm</span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small text-muted mb-0">Largura</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" step="0.5" class="form-control" value="@F(b.Width)" @onchange="e => SetPos(e, 'W')" />
+                                    <span class="input-group-text">mm</span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small text-muted mb-0">Altura</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" step="0.5" class="form-control" value="@F(b.Height)" @onchange="e => SetPos(e, 'H')" />
+                                    <span class="input-group-text">mm</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-check form-switch mt-3">
+                            <input class="form-check-input" type="checkbox" id="chkHide" checked="@b.Hidden" @onchange="ToggleHidden" />
+                            <label class="form-check-label small" for="chkHide">Ocultar este campo</label>
+                        </div>
+
+                        @if (overrides.ContainsKey(s.Name))
+                        {
+                            <button class="btn btn-sm btn-outline-secondary w-100 mt-3" @onclick="() => ResetarCampo(s.Name)">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i>Voltar este campo ao original
+                            </button>
+                        }
+                    }
+                </div>
+            </div>
+
+            <button class="btn btn-outline-primary w-100 mt-3" @onclick="TogglePreview">
+                <i class="bi bi-eye me-1"></i>@(mostrarPreview ? "Ocultar" : "Mostrar") pré-visualização
+            </button>
+        </aside>
+    </div>
+
+    @if (mostrarPreview)
+    {
+        <div class="card preview-card">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span><i class="bi bi-file-earmark-pdf me-1"></i>Pré-visualização</span>
+                <div class="d-flex align-items-end gap-2 flex-wrap">
+                    @foreach (var p in parametros)
+                    {
+                        <div>
+                            <label class="form-label small text-muted mb-0 d-block lh-1">@p</label>
+                            <input class="form-control form-control-sm" style="width:150px" placeholder="@p"
+                                   @bind:get="GetTeste(p)" @bind:set="v => SetTeste(p, v)" />
+                        </div>
+                    }
+                    <button class="btn btn-sm btn-primary" @onclick="AtualizarPreview"><i class="bi bi-arrow-repeat me-1"></i>Gerar</button>
+                    @if (previewUrl is not null)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" href="@previewUrl" target="_blank" title="Abrir em nova aba"><i class="bi bi-box-arrow-up-right"></i></a>
+                    }
+                </div>
+            </div>
+            <div class="card-body p-0">
+                @if (previewUrl is not null)
+                {
+                    <iframe src="@previewUrl" class="preview-frame"></iframe>
+                }
+                else
+                {
+                    <div class="text-muted small text-center p-5">
+                        Preencha os valores e clique em <b>Gerar</b>.
+                        <div class="mt-1">O preview mostra o que está <b>salvo</b> — salve os ajustes antes.</div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}
+
 <Modal @bind-Visible="jsonVisible" Title="JSON do layout (report.layout.json)">
-    <p class="text-muted small">Edite direto o JSON dos ajustes. A chave é o <b>nome</b> do campo; cada medida (<code>leftMm</code>, <code>topMm</code>, <code>widthMm</code>, <code>heightMm</code>, <code>hidden</code>) é opcional.</p>
+    <p class="text-muted small">A chave é o <b>nome</b> do campo; cada medida (<code>leftMm</code>, <code>topMm</code>, <code>widthMm</code>, <code>heightMm</code>, <code>hidden</code>) é opcional.</p>
     <textarea class="form-control font-monospace" rows="16" @bind="jsonText" spellcheck="false"></textarea>
     @if (jsonErro is not null)
     {
@@ -34,141 +183,36 @@
     </div>
 </Modal>
 
-@if (tpl is null)
-{
-    <div class="alert alert-light border">@(erro ?? "Carregando…")</div>
-}
-else
-{
-    <div class="row g-3">
-        <div class="col-lg-8">
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <span class="text-muted small">Zoom</span>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="() => Zoom(-1)" disabled="@(scale <= 2.0)"><i class="bi bi-dash-lg"></i></button>
-                <span class="small fw-semibold" style="min-width:42px;text-align:center">@((scale / 3.0).ToString("0.0"))×</span>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="() => Zoom(1)" disabled="@(scale >= 12.0)"><i class="bi bi-plus-lg"></i></button>
-            </div>
-            <div class="layout-canvas" @ref="canvas">
-                @foreach (var sec in Secoes())
-                {
-                    <div class="band-label">@sec.Label <span class="text-muted">· @F(sec.Band.HeightMm) mm</span></div>
-                    <div class="band" style="width:@Px(tpl.ContentWidthMm)px; height:@Px(Math.Max(sec.Band.HeightMm, 6))px;">
-                        @foreach (var el in sec.Band.Elements)
-                        {
-                            var b = Eff(el);
-                            var isSel = el.Name == selecionado;
-                            <div class="rp-field @(el is RbLine ? "is-line" : "") @(b.Hidden ? "is-hidden" : "") @(isSel ? "sel" : "")"
-                                 data-name="@el.Name"
-                                 style="left:@Px(b.Left)px; top:@Px(b.Top)px; width:@Px(Math.Max(b.Width,2))px; height:@Px(Math.Max(b.Height,2))px;"
-                                 title="@el.Name"
-                                 @onclick="() => Selecionar(el.Name)">
-                                <span class="rp-field-txt">@Rotulo(el)</span>
-                            </div>
-                        }
-                    </div>
-                }
-            </div>
-            <div class="text-muted small mt-2">
-                <i class="bi bi-info-circle me-1"></i>Clique num campo para selecioná-lo e ajustar os valores à direita. Arraste para mover.
-            </div>
-        </div>
-
-        <div class="col-lg-4">
-            <div class="card mb-3">
-                <div class="card-header">Campo selecionado</div>
-                <div class="card-body">
-                    @if (sel is not { } s)
-                    {
-                        <div class="text-muted small">Nenhum campo selecionado.</div>
-                    }
-                    else
-                    {
-                        var b = Eff(s);
-                        <div class="fw-semibold mb-1">@Rotulo(s)</div>
-                        <div class="text-muted small font-monospace mb-3">@s.Name</div>
-
-                        <div class="row g-2">
-                            <div class="col-6">
-                                <label class="form-label small mb-0">Esquerda (mm)</label>
-                                <input type="number" step="0.5" class="form-control form-control-sm"
-                                       value="@F(b.Left)" @onchange="e => SetPos(e, 'L')" />
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label small mb-0">Topo (mm)</label>
-                                <input type="number" step="0.5" class="form-control form-control-sm"
-                                       value="@F(b.Top)" @onchange="e => SetPos(e, 'T')" />
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label small mb-0">Largura (mm)</label>
-                                <input type="number" step="0.5" class="form-control form-control-sm"
-                                       value="@F(b.Width)" @onchange="e => SetPos(e, 'W')" />
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label small mb-0">Altura (mm)</label>
-                                <input type="number" step="0.5" class="form-control form-control-sm"
-                                       value="@F(b.Height)" @onchange="e => SetPos(e, 'H')" />
-                            </div>
-                        </div>
-
-                        <div class="form-check mt-3">
-                            <input class="form-check-input" type="checkbox" id="chkHide"
-                                   checked="@b.Hidden" @onchange="ToggleHidden" />
-                            <label class="form-check-label small" for="chkHide">Ocultar este campo</label>
-                        </div>
-
-                        @if (overrides.ContainsKey(s.Name))
-                        {
-                            <button class="btn btn-sm btn-outline-secondary mt-3" @onclick="() => ResetarCampo(s.Name)">
-                                <i class="bi bi-arrow-counterclockwise me-1"></i>Voltar ao original
-                            </button>
-                        }
-                    }
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>Pré-visualizar</span>
-                    <button class="btn btn-sm btn-primary" @onclick="AtualizarPreview"><i class="bi bi-arrow-repeat me-1"></i>Gerar</button>
-                </div>
-                <div class="card-body">
-                    @if (parametros.Count > 0)
-                    {
-                        <div class="small text-muted mb-1">Valores de teste</div>
-                        @foreach (var p in parametros)
-                        {
-                            <input class="form-control form-control-sm mb-2" placeholder="@p"
-                                   @bind:get="GetTeste(p)" @bind:set="v => SetTeste(p, v)" />
-                        }
-                    }
-                    @if (previewUrl is not null)
-                    {
-                        <iframe src="@previewUrl" class="preview-frame"></iframe>
-                        <a class="small" href="@previewUrl" target="_blank">Abrir em nova aba ↗</a>
-                    }
-                    else
-                    {
-                        <div class="text-muted small">Preencha os valores e clique em <b>Gerar</b>. Dica: salve o layout antes para ver os ajustes.</div>
-                    }
-                </div>
-            </div>
-        </div>
-    </div>
-}
-
 <style>
-    .layout-canvas { overflow:auto; background:#fff; border:1px solid #dee2e6; border-radius:.5rem; padding:12px; }
-    .band-label { font-size:.72rem; font-weight:600; color:#6b0d0d; margin:10px 0 2px; }
-    .band { position:relative; background:#fbfbfb; border:1px dashed #cdd3da; }
-    .rp-field { position:absolute; box-sizing:border-box; border:1px solid #9bb3d4; background:rgba(13,110,253,.08);
-                font-size:11px; line-height:1.05; overflow:hidden; cursor:grab; user-select:none; padding:1px 3px; white-space:nowrap; }
-    .rp-field:hover { border-color:#0d6efd; background:rgba(13,110,253,.14); }
-    .rp-field.sel { border-color:#d20a11; background:rgba(210,10,17,.12); box-shadow:0 0 0 2px rgba(210,10,17,.25); z-index:5; }
-    .rp-field.is-line { background:#adb5bd; border:none; }
-    .rp-field.is-hidden { opacity:.35; border-style:dotted; }
-    .rp-field.rp-dragging { cursor:grabbing; opacity:.8; z-index:10; }
+    .editor-toolbar { position:sticky; top:0; z-index:20; display:flex; justify-content:space-between; align-items:center;
+                      gap:12px; flex-wrap:wrap; background:#fff; border:1px solid #e5e7eb; border-radius:.6rem;
+                      padding:10px 14px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+    .editor-grid { display:grid; grid-template-columns:1fr 320px; gap:16px; align-items:start; }
+    @@media (max-width:991px){ .editor-grid { grid-template-columns:1fr; } }
+    .editor-side { position:sticky; top:72px; }
+    .layout-canvas { background:#f4f5f7; border:1px solid #e5e7eb; border-radius:.6rem; padding:16px;
+                     max-height:74vh; overflow:auto; }
+    .band-card { background:#fff; border:1px solid #e5e7eb; border-radius:.45rem; margin-bottom:14px; overflow:hidden;
+                 box-shadow:0 1px 2px rgba(0,0,0,.04); }
+    .band-head { font-size:.72rem; font-weight:700; letter-spacing:.02em; text-transform:uppercase; color:#6b0d0d;
+                 background:#faf6f6; border-bottom:1px solid #f0e3e3; padding:5px 10px; display:flex; justify-content:space-between; }
+    .band-dim { color:#9aa0a6; font-weight:600; }
+    .band { position:relative; margin:10px; background:
+            linear-gradient(#eef0f3 1px, transparent 1px) 0 0/100% 10px,
+            linear-gradient(90deg,#eef0f3 1px, transparent 1px) 0 0/10px 100%, #fff;
+            border:1px solid #eceef1; border-radius:3px; }
+    .rp-field { position:absolute; box-sizing:border-box; border:1px solid #9bb3d4; border-radius:3px;
+                background:rgba(13,110,253,.08); color:#243b53; font-size:11px; line-height:1.1; overflow:hidden;
+                cursor:grab; user-select:none; padding:2px 4px; white-space:nowrap; transition:box-shadow .08s,border-color .08s; }
+    .rp-field:hover { border-color:#0d6efd; background:rgba(13,110,253,.16); box-shadow:0 1px 4px rgba(13,110,253,.25); z-index:4; }
+    .rp-field.sel { border-color:#d20a11; background:rgba(210,10,17,.12); box-shadow:0 0 0 2px rgba(210,10,17,.3); z-index:6; }
+    .rp-field.is-line { background:#9aa0a6; border-color:#9aa0a6; }
+    .rp-field.is-hidden { opacity:.4; border-style:dashed; }
+    .rp-field.rp-dragging { cursor:grabbing; opacity:.85; z-index:12; }
     .rp-field-txt { pointer-events:none; }
-    .preview-frame { width:100%; height:480px; border:1px solid #dee2e6; border-radius:.375rem; margin-top:.25rem; }
+    .prop-card { border:1px solid #e5e7eb; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+    .preview-card { margin-top:16px; border:1px solid #e5e7eb; }
+    .preview-frame { width:100%; height:78vh; border:0; display:block; }
 </style>
 
 @code {
@@ -181,6 +225,7 @@ else
     string? erro;
     string? selecionado;
     string? previewUrl;
+    bool mostrarPreview;
 
     readonly Dictionary<string, ElementOverride> overrides = new(StringComparer.OrdinalIgnoreCase);
     readonly Stack<Dictionary<string, ElementOverride>> historico = new(); // p/ desfazer
@@ -213,22 +258,34 @@ else
     {
         if (first && tpl is not null)
         {
-            module = await JS.InvokeAsync<IJSObjectReference>("import", "./layout-editor.js");
-            selfRef = DotNetObjectReference.Create(this);
-            await module.InvokeVoidAsync("enableDrag", canvas, selfRef, scale);
+            try
+            {
+                // ?v= evita o navegador usar uma versão antiga do módulo em cache
+                module = await JS.InvokeAsync<IJSObjectReference>("import", "./layout-editor.js?v=3");
+                selfRef = DotNetObjectReference.Create(this);
+                await module.InvokeVoidAsync("enableDrag", canvas, selfRef);
+            }
+            catch
+            {
+                // sem o arrastar o editor ainda funciona pelos campos numéricos
+            }
         }
     }
 
     [JSInvokable]
-    public Task OnFieldMoved(string name, double leftMm, double topMm)
+    public Task OnFieldMoved(string name, double leftPx, double topPx)
     {
         Snapshot();
-        Merge(name, o => o with { LeftMm = Round(leftMm), TopMm = Round(topMm) });
+        Merge(name, o => o with { LeftMm = Round(leftPx / scale), TopMm = Round(topPx / scale) });
         selecionado = name;
         return InvokeAsync(StateHasChanged);
     }
 
-    // ---- desfazer (historico de estados) ----
+    void Zoom(double delta) => scale = Math.Clamp(scale + delta, 2.5, 14.0);
+
+    void TogglePreview() => mostrarPreview = !mostrarPreview;
+
+    // ---- desfazer ----
     void Snapshot() => historico.Push(new Dictionary<string, ElementOverride>(overrides, StringComparer.OrdinalIgnoreCase));
 
     void Desfazer()
@@ -264,15 +321,14 @@ else
         RbDbText d => "⬚ " + d.DataField,
         RbDbMemo m => "▤ " + m.DataField,
         RbSystemVariable v => "⚙ " + v.VarType,
-        RbImage => "🖼",
+        RbImage => "🖼 imagem",
         RbShape => "▭",
         RbLine => "",
         _ => el.Name
     };
 
-    static string Trunc(string s) => s.Length > 40 ? s[..40] + "…" : s;
+    static string Trunc(string s) => s.Length > 44 ? s[..44] + "…" : s;
 
-    // posicao/tamanho efetivos (base + override)
     (double Left, double Top, double Width, double Height, bool Hidden) Eff(RbElement el)
     {
         if (overrides.TryGetValue(el.Name, out var o))
@@ -331,7 +387,7 @@ else
         Toasts.Info("Ajustes descartados (ainda não salvos).");
     }
 
-    // ---- editor de JSON (report.layout.json) ----
+    // ---- JSON ----
     void AbrirJson()
     {
         jsonErro = null;
@@ -357,12 +413,13 @@ else
         }
     }
 
+    // ---- salvar / preview ----
     async Task Salvar()
     {
         try
         {
             await Store.SaveLayoutAsync(codigo, overrides);
-            if (previewUrl is not null) AtualizarPreview(); // reflete o que acabou de salvar
+            if (previewUrl is not null) AtualizarPreview();
             Toasts.Success("Layout salvo!");
         }
         catch (Exception ex)
@@ -376,18 +433,12 @@ else
 
     void AtualizarPreview()
     {
+        mostrarPreview = true;
         var qs = string.Join("&", parametros
             .Where(n => !string.IsNullOrWhiteSpace(GetTeste(n)))
             .Select(n => Uri.EscapeDataString(n) + "=" + Uri.EscapeDataString(GetTeste(n))));
         var baseUrl = $"/reports/{Uri.EscapeDataString(codigo)}/pdf";
-        var sep = qs.Length > 0 ? "?" + qs + "&" : "?";
-        previewUrl = baseUrl + sep + "v=" + DateTime.Now.Ticks; // cache-buster
-    }
-
-    async Task Zoom(double delta)
-    {
-        scale = Math.Clamp(scale + delta, 2.0, 12.0);
-        if (module is not null) await module.InvokeVoidAsync("setScale", scale);
+        previewUrl = baseUrl + (qs.Length > 0 ? "?" + qs + "&" : "?") + "v=" + DateTime.Now.Ticks;
     }
 
     static double Round(double v) => Math.Round(v, 2);

@@ -1,18 +1,13 @@
 // Arrastar campos no editor de layout. O movimento e feito no cliente (suave);
-// so a posicao final (em mm) e enviada ao Blazor no "soltar".
-let currentScale = 3.0;
-
-export function setScale(s) { currentScale = s; }
-
-export function enableDrag(container, dotnet, scale) {
-    currentScale = scale;
+// no "soltar" so a posicao final em PIXELS volta ao Blazor, que converte para
+// mm usando o zoom atual (assim o zoom nao precisa falar com o JS).
+export function enableDrag(container, dotnet) {
     let drag = null;
 
     container.addEventListener('pointerdown', e => {
         const field = e.target.closest('.rp-field');
         if (!field || !container.contains(field)) return;
-        const name = field.getAttribute('data-name');
-        if (!name) return; // campo sem nome nao e ajustavel
+        if (!field.getAttribute('data-name')) return; // campo sem nome nao e ajustavel
 
         drag = {
             field,
@@ -28,8 +23,8 @@ export function enableDrag(container, dotnet, scale) {
 
     container.addEventListener('pointermove', e => {
         if (!drag) return;
-        let nl = Math.max(0, drag.origLeft + (e.clientX - drag.startX));
-        let nt = Math.max(0, drag.origTop + (e.clientY - drag.startY));
+        const nl = Math.max(0, drag.origLeft + (e.clientX - drag.startX));
+        const nt = Math.max(0, drag.origTop + (e.clientY - drag.startY));
         drag.field.style.left = nl + 'px';
         drag.field.style.top = nt + 'px';
     });
@@ -38,11 +33,11 @@ export function enableDrag(container, dotnet, scale) {
         if (!drag) return;
         const f = drag.field;
         const name = f.getAttribute('data-name');
-        const leftMm = (parseFloat(f.style.left) || 0) / currentScale;
-        const topMm = (parseFloat(f.style.top) || 0) / currentScale;
+        const leftPx = parseFloat(f.style.left) || 0;
+        const topPx = parseFloat(f.style.top) || 0;
         f.classList.remove('rp-dragging');
         drag = null;
-        dotnet.invokeMethodAsync('OnFieldMoved', name, leftMm, topMm);
+        dotnet.invokeMethodAsync('OnFieldMoved', name, leftPx, topPx);
     };
     container.addEventListener('pointerup', end);
     container.addEventListener('pointercancel', end);
