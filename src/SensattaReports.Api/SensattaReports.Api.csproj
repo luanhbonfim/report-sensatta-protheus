@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
     <!-- Nome do servico quando rodar como Windows Service / systemd -->
     <AssemblyName>SensattaReports.Api</AssemblyName>
+    <!-- API headless: sem wwwroot / arquivos estaticos (evita o StaticWebAssets
+         procurar a pasta wwwroot inexistente no startup). -->
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
   </PropertyGroup>
 
   <ItemGroup>
