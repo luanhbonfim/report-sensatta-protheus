@@ -29,6 +29,9 @@ Dois grupos de endpoints:
 | **Geração** | `/reports/...` | Protheus **e** o preview do painel | JWT (role qualquer) |
 | **Gerenciamento** | `/api/...` | **o painel** | JWT (role `admin`) |
 
+> 📖 **Página interativa da API:** `http://192.168.85.61:5080/docs` (Scalar/OpenAPI)
+> — lista e testa todos os endpoints. Spec em `/openapi/v1.json`.
+
 **Base URL (dev):** `http://192.168.85.61:5080` — a máquina do dev na LAN (o serviço
 escuta em `0.0.0.0:5080`, então é acessível de outra máquina na rede; localmente
 também responde em `http://localhost:5080`). Em produção, será o host/porta do

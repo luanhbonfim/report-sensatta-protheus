@@ -121,7 +121,7 @@ public static class Auth
                 expires_in = minutes * 60,
                 role = claims[1].Value
             });
-        }).DisableAntiforgery();
+        }).DisableAntiforgery().WithTags("Autenticação");
     }
 }
 

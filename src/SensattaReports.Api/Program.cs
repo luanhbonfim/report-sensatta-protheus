@@ -70,6 +70,9 @@ builder.Services.AddSingleton<ReportService>();
 // Log em memoria das chamadas (exposto em GET /api/calls).
 builder.Services.AddSingleton<SensattaReports.Api.Services.CallLogService>();
 
+// Documentacao OpenAPI (gera /openapi/v1.json; a pagina /docs consome isso).
+builder.Services.AddOpenApi();
+
 // Autenticacao: JWT Bearer para os consumidores (Protheus e painel). So e
 // exigido quando Jwt:Secret esta configurado (sem ele, dev aberto).
 var jwtOn = Auth.IsEnabled(builder.Configuration);
@@ -103,6 +106,23 @@ app.Logger.LogInformation("Autenticacao JWT: {Estado}",
 // Verificacao de saude (o Protheus/monitoramento pode checar). Sempre publica.
 app.MapGet("/health", () => Results.Ok(new { status = "ok", time = DateTime.UtcNow }));
 
+// Documentacao da API: /openapi/v1.json (spec) + /docs (pagina interativa).
+app.MapOpenApi();
+app.MapGet("/docs", () => Results.Content("""
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sensatta Reports — API</title>
+</head>
+<body>
+  <script id="api-reference" data-url="/openapi/v1.json"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+</body>
+</html>
+""", "text/html"));
+
 // Emissao de token JWT (fluxo client-credentials) para Protheus e painel.
 app.MapTokenEndpoint();
 
@@ -125,6 +145,10 @@ var post = app.MapPost("/reports/{codigo}", async (string codigo, GerarDto body,
         ? ReportFormat.Xlsx : ReportFormat.Pdf;
     return await Generate(codigo, fmt, body.Parametros ?? new(), ctx, svc, log, ct);
 });
+
+pdf.WithTags("Geração");
+xlsx.WithTags("Geração");
+post.WithTags("Geração");
 
 // Exige JWT nas rotas de geracao quando habilitado.
 if (jwtOn)

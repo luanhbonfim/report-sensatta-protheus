@@ -125,6 +125,8 @@ conecta no Oracle 11g **sem** precisar instalar Oracle Client.
 
 | Método | Rota | Retorno |
 |---|---|---|
+| `GET` | `/docs` | **página interativa da API** (Scalar/OpenAPI) |
+| `GET` | `/openapi/v1.json` | spec OpenAPI |
 | `GET` | `/health` | status do serviço (público) |
 | `POST` | `/auth/token` | emite o token JWT (público) |
 | `GET` | `/reports/{codigo}/pdf?param=valor` | PDF |

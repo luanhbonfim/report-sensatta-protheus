@@ -17,7 +17,7 @@ public static class ManagementApi
 {
     public static void MapManagementApi(this WebApplication app, bool requireAuth)
     {
-        var api = app.MapGroup("/api").DisableAntiforgery();
+        var api = app.MapGroup("/api").DisableAntiforgery().WithTags("Gerenciamento");
         // Quando o JWT esta habilitado, o painel precisa de token com role admin.
         if (requireAuth) api.RequireAuthorization(Auth.PolicyPanel);
 

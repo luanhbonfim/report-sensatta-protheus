@@ -20,6 +20,8 @@
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     <!-- Autenticacao JWT Bearer (Protheus e painel externo) -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.13" />
+    <!-- Documentacao OpenAPI (pagina /docs + /openapi/v1.json) -->
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
   </ItemGroup>
 
   <ItemGroup>
