@@ -27,27 +27,60 @@ Dois grupos de endpoints:
 
 | Grupo | Rota base | Quem chama | Auth |
 |---|---|---|---|
-| **Geração** | `/reports/...` | Protheus **e** o preview do painel | pública (proteja por rede) |
-| **Gerenciamento** | `/api/...` | **o painel** | `X-Api-Key` |
+| **Geração** | `/reports/...` | Protheus **e** o preview do painel | JWT (role qualquer) |
+| **Gerenciamento** | `/api/...` | **o painel** | JWT (role `admin`) |
 
 Base URL do serviço (dev): `http://localhost:5080`. Em produção, o host/porta do
 serviço Windows.
 
 ---
 
-## 2. Autenticação da API de gerenciamento
+## 2. Autenticação — JWT Bearer
 
-Todas as rotas `/api/*` exigem o header **`X-Api-Key`** quando a chave estiver
-configurada no serviço (`Api:Key` no appsettings/variável de ambiente
-`Api__Key`). Se não houver chave configurada (dev), as rotas ficam liberadas.
+**Todas** as chamadas (Protheus em `/reports/*` e painel em `/api/*`) levam um
+**token JWT** no header:
 
 ```
-X-Api-Key: <a chave combinada>
+Authorization: Bearer <token>
 ```
 
-**Recomendado:** o **backend do seu painel** chama esta API (server-to-server) com a
-chave — **não** exponha a chave no navegador. (Não há CORS liberado por padrão; se
-precisar chamar direto do browser, me avise que habilito CORS por origem.)
+### Como obter o token (fluxo client-credentials)
+Cada consumidor tem um **clientId + clientSecret** (combinados e configurados no
+serviço em `Jwt:Clients`). Troca por um token em:
+
+```
+POST /auth/token
+Content-Type: application/json
+{ "clientId": "painel", "clientSecret": "<segredo do painel>" }
+```
+Resposta `200`:
+```json
+{ "access_token": "eyJhbGci...", "token_type": "Bearer", "expires_in": 3600, "role": "admin" }
+```
+`401` se as credenciais forem inválidas. O token expira em `expires_in` segundos
+(renove pedindo outro). Dois clientes típicos:
+
+| clientId | role | pode acessar |
+|---|---|---|
+| `protheus` | `reports` | `/reports/*` (gerar relatórios) |
+| `painel` | `admin` | `/api/*` (gerenciar) **e** `/reports/*` |
+
+### Preview em `<iframe>`
+O navegador não manda header `Authorization` num `<iframe>`. Para o preview, passe o
+token na **query string** das rotas **GET** de geração:
+```
+/reports/{codigo}/pdf?paramA=...&access_token=<token>
+```
+(só é aceito em `/reports/*`.)
+
+### Observações
+- **Dev:** se `Jwt:Secret` não estiver configurado no serviço, a proteção fica
+  **desligada** e tudo responde sem token (facilita o desenvolvimento local).
+- **Recomendado:** o **backend do seu painel** guarda o `clientSecret`, obtém o token
+  e chama a API (server-to-server) — não exponha o secret no navegador. Para o
+  preview, gere um token e injete no `src` do iframe.
+- Sem CORS liberado por padrão (chamadas server-to-server). Se precisar chamar do
+  browser, me avise que habilito CORS por origem.
 
 Respostas são **JSON em camelCase**. Erros vêm como `{ "error": "mensagem" }` com o
 status HTTP adequado (400/401/404/500).
@@ -279,8 +312,9 @@ gravando um *overlay* (os `overrides`). O serviço aplica esses ajustes ao rende
   dos overrides direto (um textarea que valida e aplica), **voltar um campo ao original**
   (remover a entrada do override).
 - **Salvar** → `PUT .../layout`. **Pré-visualizar** → modal grande com
-  `<iframe src="/reports/{codigo}/pdf?params&v=timestamp">` (o `v` evita cache). O
-  preview reflete o que está **salvo** — salve antes.
+  `<iframe src="/reports/{codigo}/pdf?params&access_token=<token>&v=timestamp">` (o
+  `access_token` autentica o iframe; o `v` evita cache). O preview reflete o que
+  está **salvo** — salve antes.
 
 ### 6.4 Formato dos overrides (o corpo do PUT e o `report.layout.json`)
 ```json
@@ -312,8 +346,9 @@ O painel **não** mexe em arquivos diretamente — faz tudo pela API `/api/*`.
 - **Concorrência / performance**: a API limita relatórios pesados simultâneos
   (semáforo); o painel não precisa se preocupar.
 - **Logo e fontes** do PDF são resolvidas no serviço.
-- **Segurança**: as rotas `/reports/*` hoje são públicas (para o Protheus) — proteja
-  por rede/firewall. As rotas `/api/*` usam `X-Api-Key`.
+- **Segurança**: tudo usa **JWT Bearer** (seção 2). `/reports/*` aceita qualquer
+  token válido (role `reports` ou `admin`); `/api/*` exige role `admin`. Em dev,
+  sem `Jwt:Secret`, fica aberto.
 - **Migração**: enquanto o painel novo não entra, o painel Blazor em `/admin` segue
   funcionando como referência. Quando o seu painel assumir, o Blazor (e a auth por
   cookie) pode ser removido do serviço para ele virar 100% headless.

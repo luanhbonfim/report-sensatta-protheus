@@ -15,22 +15,11 @@ namespace SensattaReports.Api;
 /// </summary>
 public static class ManagementApi
 {
-    public static void MapManagementApi(this WebApplication app)
+    public static void MapManagementApi(this WebApplication app, bool requireAuth)
     {
-        var apiKey = app.Configuration["Api:Key"];
-
-        var api = app.MapGroup("/api").DisableAntiforgery().AddEndpointFilter(async (ctx, next) =>
-        {
-            // Se Api:Key estiver configurada, exige o header X-Api-Key.
-            // Sem chave configurada (dev), libera.
-            if (!string.IsNullOrWhiteSpace(apiKey))
-            {
-                var sent = ctx.HttpContext.Request.Headers["X-Api-Key"].ToString();
-                if (!string.Equals(sent, apiKey, StringComparison.Ordinal))
-                    return Results.Json(new { error = "X-Api-Key inválida ou ausente." }, statusCode: 401);
-            }
-            return await next(ctx);
-        });
+        var api = app.MapGroup("/api").DisableAntiforgery();
+        // Quando o JWT esta habilitado, o painel precisa de token com role admin.
+        if (requireAuth) api.RequireAuthorization(Auth.PolicyPanel);
 
         // ---- Catalogo (SIGMA.REPORT): lista nomes e marca os ja importados ----
         api.MapGet("/catalog", async (IReportCatalog catalog, ReportFileStore store) =>

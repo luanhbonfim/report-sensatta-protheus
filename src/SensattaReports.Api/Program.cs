@@ -76,8 +76,11 @@ builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddScoped<SensattaReports.Api.Services.ToastService>();
 builder.Services.AddSingleton<SensattaReports.Api.Services.CallLogService>();
 
-// Autenticacao por cookie para o painel. Credenciais em Admin:User/Admin:Password.
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+// Autenticacao: cookie para o painel Blazor (/admin) + JWT Bearer para os
+// consumidores externos (Protheus e painel externo). O JWT so e exigido quando
+// Jwt:Secret esta configurado (sem ele, dev aberto).
+var jwtOn = Auth.IsEnabled(builder.Configuration);
+var authBuilder = builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(o =>
     {
         o.LoginPath = "/login.html";
@@ -85,7 +88,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         o.ExpireTimeSpan = TimeSpan.FromHours(8);
         o.SlidingExpiration = true;
     });
-builder.Services.AddAuthorization();
+if (jwtOn) authBuilder.AddReportsJwt(builder.Configuration);
+builder.Services.AddReportsPolicies();
 
 var app = builder.Build();
 
@@ -99,28 +103,39 @@ app.UseAntiforgery();
 app.Logger.LogInformation("Repositorio de reports: {ReportSource}", reportSource);
 app.Logger.LogInformation("Fonte de dados ativa: {DataSource}", dataSource);
 
-// Verificacao de saude (o Protheus/monitoramento pode checar).
+// Verificacao de saude (o Protheus/monitoramento pode checar). Sempre publica.
 app.MapGet("/health", () => Results.Ok(new { status = "ok", time = DateTime.UtcNow }));
 
-// API HTTP de gerenciamento (JSON) consumida pelo painel externo. Protegida
-// por X-Api-Key (Api:Key). Ver SensattaReports.Api.ManagementApi.
-app.MapManagementApi();
+// Emissao de token JWT (fluxo client-credentials) para Protheus e painel.
+app.MapTokenEndpoint();
 
-// Download direto (GET) — pratico para o Protheus via FWRest/HttpGet.
+// API HTTP de gerenciamento (JSON) consumida pelo painel externo.
+// Exige JWT com role admin quando o JWT esta habilitado.
+app.MapManagementApi(jwtOn);
+
+// Geracao de relatorio (GET pratico p/ Protheus via FWRest/HttpGet).
 // Ex.: /reports/resumo-coletas-eua/pdf?data_ini=2026-10-01&data_fim=2026-10-31
-app.MapGet("/reports/{codigo}/pdf", (string codigo, HttpContext ctx, ReportService svc, CallLogService log, CancellationToken ct)
+var pdf = app.MapGet("/reports/{codigo}/pdf", (string codigo, HttpContext ctx, ReportService svc, CallLogService log, CancellationToken ct)
     => Generate(codigo, ReportFormat.Pdf, QueryParams(ctx), ctx, svc, log, ct));
 
-app.MapGet("/reports/{codigo}/xlsx", (string codigo, HttpContext ctx, ReportService svc, CallLogService log, CancellationToken ct)
+var xlsx = app.MapGet("/reports/{codigo}/xlsx", (string codigo, HttpContext ctx, ReportService svc, CallLogService log, CancellationToken ct)
     => Generate(codigo, ReportFormat.Xlsx, QueryParams(ctx), ctx, svc, log, ct));
 
 // Alternativa por POST com corpo JSON: { "format": "pdf", "parametros": { "data_ini": "..." } }
-app.MapPost("/reports/{codigo}", async (string codigo, GerarDto body, HttpContext ctx, ReportService svc, CallLogService log, CancellationToken ct) =>
+var post = app.MapPost("/reports/{codigo}", async (string codigo, GerarDto body, HttpContext ctx, ReportService svc, CallLogService log, CancellationToken ct) =>
 {
     var fmt = string.Equals(body.Format, "xlsx", StringComparison.OrdinalIgnoreCase)
         ? ReportFormat.Xlsx : ReportFormat.Pdf;
     return await Generate(codigo, fmt, body.Parametros ?? new(), ctx, svc, log, ct);
 });
+
+// Exige JWT (ou cookie do /admin) nas rotas de geracao quando habilitado.
+if (jwtOn)
+{
+    pdf.RequireAuthorization(Auth.PolicyReports);
+    xlsx.RequireAuthorization(Auth.PolicyReports);
+    post.RequireAuthorization(Auth.PolicyReports);
+}
 
 // ---------------------------------------------------------------------------
 // Painel administrativo em Blazor Server (/admin). Os componentes chamam os
