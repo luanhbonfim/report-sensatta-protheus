@@ -30,8 +30,10 @@ Dois grupos de endpoints:
 | **Geração** | `/reports/...` | Protheus **e** o preview do painel | JWT (role qualquer) |
 | **Gerenciamento** | `/api/...` | **o painel** | JWT (role `admin`) |
 
-Base URL do serviço (dev): `http://localhost:5080`. Em produção, o host/porta do
-serviço Windows.
+**Base URL (dev):** `http://192.168.85.61:5080` — a máquina do dev na LAN (o serviço
+escuta em `0.0.0.0:5080`, então é acessível de outra máquina na rede; localmente
+também responde em `http://localhost:5080`). Em produção, será o host/porta do
+serviço Windows. *(Se não conectar, liberar a porta 5080 no firewall da máquina.)*
 
 ---
 
@@ -91,12 +93,12 @@ status HTTP adequado (400/401/404/500). Token ausente/inválido/expirado → **4
 ### Exemplo fim-a-fim (painel)
 ```bash
 # 1) pega o token (o backend do painel faz isso)
-TOKEN=$(curl -s -X POST http://localhost:5080/auth/token \
+TOKEN=$(curl -s -X POST http://192.168.85.61:5080/auth/token \
   -H "Content-Type: application/json" \
   -d '{"clientId":"painel","clientSecret":"<segredo>"}' | jq -r .access_token)
 
 # 2) usa em cada chamada
-curl http://localhost:5080/api/reports -H "Authorization: Bearer $TOKEN"
+curl http://192.168.85.61:5080/api/reports -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
