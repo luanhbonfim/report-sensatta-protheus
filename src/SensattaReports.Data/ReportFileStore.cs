@@ -63,6 +63,15 @@ public sealed class ReportFileStore(string baseDir)
             JsonSerializer.Serialize(new { name = nome }, JsonOpts), ct);
     }
 
+    /// <summary>Remove um report (apaga a pasta reports/&lt;codigo&gt;). true se existia.</summary>
+    public bool Delete(string codigo)
+    {
+        var dir = Path.Combine(baseDir, codigo);
+        if (!Directory.Exists(dir)) return false;
+        Directory.Delete(dir, recursive: true);
+        return true;
+    }
+
     /// <summary>Le os ajustes de layout (report.layout.json) de um report.</summary>
     public IReadOnlyDictionary<string, ElementOverride> GetLayout(string codigo)
     {

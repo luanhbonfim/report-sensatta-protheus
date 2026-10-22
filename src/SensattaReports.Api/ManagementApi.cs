@@ -95,6 +95,15 @@ public static class ManagementApi
             return Results.Ok(new { codigo, nome, endpointPdf = $"/reports/{codigo}/pdf" });
         });
 
+        // ---- Excluir um report (apaga a pasta reports/<codigo>) ----
+        api.MapDelete("/reports/{codigo}", (string codigo, ReportFileStore store) =>
+        {
+            var removido = store.Delete(codigo);
+            return removido
+                ? Results.Ok(new { codigo, deleted = true })
+                : Results.NotFound(new { error = "Report não encontrado." });
+        });
+
         // ---- Layout do report (bandas + campos + ajustes) para o editor ----
         api.MapGet("/reports/{codigo}/layout", async (string codigo, IReportRepository repo, ReportFileStore store) =>
         {

@@ -91,10 +91,22 @@ var authBuilder = builder.Services.AddAuthentication(CookieAuthenticationDefault
 if (jwtOn) authBuilder.AddReportsJwt(builder.Configuration);
 builder.Services.AddReportsPolicies();
 
+// CORS: permite o painel (outro domonio) chamar a API pelo navegador. As origens
+// vem de Cors:Origins (array). Sem origens configuradas, libera qualquer origem
+// (pratico em dev; em producao defina as origens do painel).
+var corsOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [];
+builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
+{
+    if (corsOrigins.Length > 0) p.WithOrigins(corsOrigins);
+    else p.AllowAnyOrigin();
+    p.AllowAnyHeader().AllowAnyMethod();
+}));
+
 var app = builder.Build();
 
 // Arquivos estaticos (CSS do painel etc.) + antiforgery exigido pelo Blazor.
 app.UseStaticFiles();
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();

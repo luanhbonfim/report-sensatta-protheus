@@ -79,8 +79,11 @@ token na **query string** das rotas **GET** de geração:
 - **Recomendado:** o **backend do seu painel** guarda o `clientSecret`, obtém o token
   e chama a API (server-to-server) — não exponha o secret no navegador. Para o
   preview, gere um token e injete no `src` do iframe.
-- Sem CORS liberado por padrão (chamadas server-to-server). Se precisar chamar do
-  browser, me avise que habilito CORS por origem.
+- **CORS habilitado**: o painel pode chamar a API **direto do navegador**. As origens
+  permitidas vêm de `Cors:Origins` (config do serviço); sem origens configuradas,
+  libera qualquer origem (dev). Em produção, informe a origem do painel ao time do
+  serviço para colocar em `Cors:Origins` (ex.: `https://painel.betterbeef.com.br`).
+  Ainda assim, **preferir** chamar do backend do painel (pra não expor o `clientSecret`).
 
 Respostas são **JSON em camelCase**. Erros vêm como `{ "error": "mensagem" }` com o
 status HTTP adequado (400/401/404/500). Token ausente/inválido/expirado → **401**.
@@ -95,6 +98,26 @@ TOKEN=$(curl -s -X POST http://localhost:5080/auth/token \
 # 2) usa em cada chamada
 curl http://localhost:5080/api/reports -H "Authorization: Bearer $TOKEN"
 ```
+
+---
+
+## 2.1 Resumo dos endpoints
+
+| Método | Rota | Auth | O quê |
+|---|---|---|---|
+| POST | `/auth/token` | — | Emite o token JWT |
+| GET | `/health` | — | Saúde do serviço |
+| GET | `/reports/{cod}/pdf` | reports | Gera PDF (inline) |
+| GET | `/reports/{cod}/xlsx` | reports | Gera Excel (download) |
+| POST | `/reports/{cod}` | reports | Gera (formato+params no corpo) |
+| GET | `/api/catalog` | admin | Catálogo SIGMA.REPORT |
+| GET | `/api/reports` | admin | Lista importados |
+| GET | `/api/reports/{cod}` | admin | Definição (SQL+params) |
+| POST | `/api/reports/{cod}` | admin | Salvar/importar |
+| DELETE | `/api/reports/{cod}` | admin | Excluir |
+| GET | `/api/reports/{cod}/layout` | admin | Layout (p/ o editor) |
+| PUT | `/api/reports/{cod}/layout` | admin | Salvar ajustes de layout |
+| GET | `/api/calls` | admin | Log de chamadas |
 
 ---
 
@@ -197,7 +220,15 @@ Erros: `400` se faltar SQL ou se não houver `.rtm` no catálogo nem salvo.
 > Pode detectá-los no front e pré-preencher a tabela de parâmetros (tipo "adivinhado"
 > por heurística do nome: `data*`→Date, `*_id`/`cod*`→Integer, etc.).
 
-### 4.5 Layout de um relatório (para o editor visual)
+### 4.5 Excluir um relatório
+Apaga o relatório (a pasta `reports/<codigo>` no serviço: SQL, `.rtm`, parâmetros e
+ajustes). **Irreversível** — confirme no painel antes.
+```
+DELETE /api/reports/{codigo}
+```
+Resposta `200`: `{ "codigo": "...", "deleted": true }`. `404` se o código não existir.
+
+### 4.6 Layout de um relatório (para o editor visual)
 Retorna as **bandas** e **campos** do `.rtm` (posições em **mm**) + os **ajustes**
 salvos. É o que alimenta o editor de arrastar.
 ```
@@ -228,7 +259,7 @@ GET /api/reports/{codigo}/layout
 - Bandas na ordem: Título, Cabeçalho, (cab. de cada grupo), Detalhe, (rodapé de
   cada grupo), Rodapé, Resumo.
 
-### 4.6 Salvar os ajustes de layout
+### 4.7 Salvar os ajustes de layout
 ```
 PUT /api/reports/{codigo}/layout
 Content-Type: application/json
@@ -244,7 +275,7 @@ Content-Type: application/json
 - Substitui o conjunto inteiro de ajustes daquele relatório. Resposta `200`:
   `{ "codigo": "...", "campos": 2 }`.
 
-### 4.7 Log das chamadas do Protheus
+### 4.8 Log das chamadas do Protheus
 ```
 GET /api/calls?take=200
 ```
@@ -274,7 +305,8 @@ total / erros = `GET /api/calls`) + tabela das últimas chamadas. Atualiza a cad
 ### 5.2 Relatórios
 Tabela de `GET /api/reports`: nome, código, nº de params, **endpoint** (`/reports/{cod}/pdf`,
 mostrar como link/código copiável), e ações: **Ver PDF** (abre o endpoint), **SQL**
-(editar SQL/parâmetros), **Layout** (editor visual).
+(editar SQL/parâmetros), **Layout** (editor visual), **Excluir** (`DELETE /api/reports/{cod}`
+com confirmação).
 
 ### 5.3 Importar
 Lista `GET /api/catalog` com busca/filtro; cada item vira um card (badge "ativo" se
@@ -371,3 +403,25 @@ O painel **não** mexe em arquivos diretamente — faz tudo pela API `/api/*`.
 Dúvidas sobre qualquer endpoint ou comportamento: o código de referência está em
 `src/SensattaReports.Api/ManagementApi.cs` (API) e
 `src/SensattaReports.Api/Components/Pages/LayoutEditor.razor` (editor).
+
+---
+
+## 9. Configuração do serviço (para quem opera a API)
+
+Chaves relevantes (em `appsettings.json`; **segredos** em `appsettings.Local.json`
+—gitignore— ou variáveis de ambiente com `__` no lugar de `:`, ex.: `Jwt__Secret`):
+
+| Chave | Para quê |
+|---|---|
+| `Jwt:Secret` | Segredo que assina os tokens. **Vazio = auth desligada (dev).** |
+| `Jwt:Issuer` / `Jwt:Audience` | Emissor/público do token (default `sensatta-reports`). |
+| `Jwt:ExpiresMinutes` | Validade do token (default 60). |
+| `Jwt:Clients` | `[{ "Id","Secret","Role" }]` — os consumidores (ex.: `protheus`/`reports`, `painel`/`admin`). |
+| `Cors:Origins` | Origens do painel liberadas no navegador. Vazio = qualquer (dev). |
+| `Reports:Source` | `File` (arquivos) ou `Oracle` (tabela REPORT). |
+| `Oracle:ConnectionString` | Conexão do banco (quando `Data:Source=Oracle`). |
+| `Urls` | Host/porta do serviço (default `http://0.0.0.0:5080`). |
+
+O serviço roda como **Windows Service** (ver `README.md`). Quando `Jwt:Secret` está
+definido, **todas** as rotas `/reports/*` e `/api/*` exigem token — combine os
+`clientSecret` com o time do painel e o do Protheus.
