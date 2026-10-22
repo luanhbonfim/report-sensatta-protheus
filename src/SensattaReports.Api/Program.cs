@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using SensattaReports.Api;
 using SensattaReports.Api.Components;
 using SensattaReports.Api.Services;
 using SensattaReports.Core;
@@ -100,6 +101,10 @@ app.Logger.LogInformation("Fonte de dados ativa: {DataSource}", dataSource);
 
 // Verificacao de saude (o Protheus/monitoramento pode checar).
 app.MapGet("/health", () => Results.Ok(new { status = "ok", time = DateTime.UtcNow }));
+
+// API HTTP de gerenciamento (JSON) consumida pelo painel externo. Protegida
+// por X-Api-Key (Api:Key). Ver SensattaReports.Api.ManagementApi.
+app.MapManagementApi();
 
 // Download direto (GET) — pratico para o Protheus via FWRest/HttpGet.
 // Ex.: /reports/resumo-coletas-eua/pdf?data_ini=2026-10-01&data_fim=2026-10-31
