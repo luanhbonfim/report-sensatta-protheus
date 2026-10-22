@@ -233,6 +233,9 @@ auth fica desligada (dev).** Detalhes no handoff e em `src/SensattaReports.Api/A
 
 ## Deploy como serviço (Windows Server)
 
+> 📘 **Passo a passo completo** (publish → copiar → config → instalar → validar →
+> atualizar): **[`docs/DEPLOY.md`](docs/DEPLOY.md)**. Abaixo, o resumo.
+
 ### 1. Publicar (pode ser do próprio Ubuntu)
 
 Gera os binários Windows numa pasta `publish/`. `--self-contained true` embute o
