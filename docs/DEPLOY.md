@@ -41,14 +41,20 @@ cd publish && zip -r ../sensatta-publish.zip . && cd ..
 
 ## 2. Levar ao servidor
 
+A pasta de destino é à sua escolha — **o Windows não tem `C:\Services` por
+padrão, você cria**. Exemplos: `C:\Services\SensattaReports`, `C:\SensattaReports`.
+(Evite `C:\Program Files\...` por causa das permissões.)
+
+```bat
+mkdir C:\Services\SensattaReports
+```
+
 Copie o `sensatta-publish.zip` para o servidor (pasta compartilhada, RDP, scp...)
-e **extraia** em, por exemplo:
+e **extraia dentro dessa pasta**. Deve ficar com `SensattaReports.Api.exe`, as
+DLLs, `reports\` e `update-service.ps1`.
 
-```
-C:\Services\SensattaReports\
-```
-
-(Dentro deve ter `SensattaReports.Api.exe`, as DLLs, `reports\` e `update-service.ps1`.)
+> **Use o mesmo caminho nos passos seguintes** (3, 4, 5 e 9). Se escolher outra
+> pasta, ajuste os comandos.
 
 ---
 
