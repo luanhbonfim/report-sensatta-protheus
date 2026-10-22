@@ -114,6 +114,8 @@ app.UseAntiforgery();
 // Log de diagnostico: mostra no console qual fonte de dados esta ativa.
 app.Logger.LogInformation("Repositorio de reports: {ReportSource}", reportSource);
 app.Logger.LogInformation("Fonte de dados ativa: {DataSource}", dataSource);
+app.Logger.LogInformation("Autenticacao JWT: {Estado}",
+    jwtOn ? "HABILITADA (token obrigatorio)" : "desligada (dev, sem Jwt:Secret)");
 
 // Verificacao de saude (o Protheus/monitoramento pode checar). Sempre publica.
 app.MapGet("/health", () => Results.Ok(new { status = "ok", time = DateTime.UtcNow }));
