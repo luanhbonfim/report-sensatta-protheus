@@ -138,10 +138,6 @@ app.MapTokenEndpoint();
 // Exige JWT com role admin quando o JWT esta habilitado.
 app.MapManagementApi(jwtOn);
 
-// Modo TV: telas HTML somente-leitura (/tv e /tv/{codigo}) para monitor/TV.
-// Liberadas na rede interna (sem JWT) — so leem/rodam o SELECT. Proteja por rede.
-app.MapTvMode();
-
 // Geracao de relatorio (GET pratico p/ Protheus via FWRest/HttpGet).
 // Ex.: /reports/resumo-coletas-eua/pdf?data_ini=2026-10-01&data_fim=2026-10-31
 var pdf = app.MapGet("/reports/{codigo}/pdf", (string codigo, HttpContext ctx, ReportService svc, CallLogService log, CancellationToken ct)

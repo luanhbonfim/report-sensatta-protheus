@@ -4,9 +4,6 @@ using SensattaReports.Core.Models;
 
 namespace SensattaReports.Core;
 
-/// <summary>Dados crus de um report (definicao + resultado do SQL).</summary>
-public sealed record ReportData(ReportDefinition Definition, ReportDataSet Data);
-
 /// <summary>
 /// Orquestra a geracao de um report:
 /// 1) busca a definicao  2) valida/converte os parametros
@@ -52,31 +49,6 @@ public sealed class ReportService
             // expoe os parametros ao layout como campos (ex.: P_ROMANEIO_INICIAL)
             data.Extras = BuildExtras(def, request.Parametros);
             return renderer.Render(def, data);
-        }
-        finally
-        {
-            _gate.Release();
-        }
-    }
-
-    /// <summary>
-    /// Executa o report e devolve os DADOS CRUS (colunas + linhas), sem
-    /// renderizar em PDF/Excel. Usado pelo "modo TV" (visualizacao em tela).
-    /// Mesma validacao de parametros e mesmo limitador de concorrencia.
-    /// </summary>
-    public async Task<ReportData> GetDataAsync(ReportRequest request, CancellationToken ct = default)
-    {
-        var def = await _repository.GetByCodigoAsync(request.Codigo, ct)
-                  ?? throw new ReportNotFoundException(request.Codigo);
-
-        var bind = BuildParameters(def, request.Parametros);
-
-        await _gate.WaitAsync(ct);
-        try
-        {
-            var data = await _dataSource.ExecuteAsync(def.Sql, bind, ct);
-            data.Extras = BuildExtras(def, request.Parametros);
-            return new ReportData(def, data);
         }
         finally
         {

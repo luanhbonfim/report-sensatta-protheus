@@ -122,15 +122,6 @@ curl http://192.168.85.61:5080/api/reports -H "Authorization: Bearer $TOKEN"
 | GET | `/api/reports/{cod}/layout` | admin | Layout (p/ o editor) |
 | PUT | `/api/reports/{cod}/layout` | admin | Salvar ajustes de layout |
 | GET | `/api/calls` | admin | Log de chamadas |
-| GET | `/tv` | — | Modo TV: índice (HTML) |
-| GET | `/tv/{cod}` | — | Modo TV: tela do report (HTML) |
-
-> **Modo TV** (`/tv`): páginas HTML prontas, somente-leitura, para exibir num
-> monitor/TV — tema escuro, atualização automática e rolagem automática. **Não
-> usam JWT** (liberadas na rede interna; só rodam o SELECT). O painel pode só
-> **linkar** para `/tv/{cod}?params` — não precisa integrar nada. Controles na
-> URL: `?refresh=N` (segundos, padrão 60; 0 desliga) e `?scroll=0` (desliga a
-> rolagem). Como é aberto, mantenha a porta restrita à rede interna.
 
 ---
 
