@@ -158,6 +158,28 @@ curl "http://<servidor>:5080/reports/romaneio-embarque-v2/pdf?romaneio_inicial=N
 > Se algo falhar, veja o **Visualizador de Eventos do Windows** (Logs do Windows →
 > Aplicativo) — o serviço registra os erros lá.
 
+### Modo TV (tela de visualização)
+
+Páginas HTML somente-leitura para pendurar num monitor/TV. **Não exigem token**
+(liberadas na rede interna — só rodam o SELECT). Basta abrir no navegador da TV:
+
+```
+http://<servidor>:5080/tv                         -> índice (lista os reports)
+http://<servidor>:5080/tv/<codigo>?param=valor    -> tela de um report
+```
+
+Exemplo:
+```
+http://<servidor>:5080/tv/romaneio-embarque-v2?romaneio_inicial=1&romaneio_final=10
+```
+
+Controles da tela (na URL, separados dos parâmetros do report):
+- `?refresh=N` — segundos entre atualizações (padrão `60`; `0` desliga).
+- `?scroll=0` — desliga a rolagem automática (ligada quando a tabela não cabe).
+
+> Como o `/tv` é aberto, mantenha a porta **5080 restrita à rede interna** no
+> firewall. As rotas `/reports` e `/api` seguem protegidas por JWT.
+
 ---
 
 ## 8. Entregar aos consumidores
